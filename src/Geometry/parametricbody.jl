@@ -1,20 +1,23 @@
 """
-    Geometry{M,N,T}
+    ParametricBody{M,N,T}
 
 A very simple (parametric) representation of a geometrical object as given by a union of `patches` of type
 `ParametricSurface{M,N,T}`.
 
 See also: [`ParametricSurface`](@ref)
 """
-struct Geometry{M,N,T}
+struct ParametricBody{M,N,T}
     patches::Vector{ParametricSurface{M,N,T}}
 end
 
-Geometry{N}(args...) where {N} = Geometry{M-1,N,Float64}(args...)
+ParametricBody{N}(args...) where {N} = ParametricBody{N-1,N,Float64}(args...)
 
-function refine!(geo::Geometry)
+function refine!(geo::ParametricBody)
     for patch in geo.patches
         refine!(patch)
     end
     return geo
 end
+
+
+
