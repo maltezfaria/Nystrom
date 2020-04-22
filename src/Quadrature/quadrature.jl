@@ -13,10 +13,16 @@ sometimes useful for routines which iterating over the `elements` instead of jus
 """
 struct Quadrature{Q,N,T}
     nodes::Vector{Point{N,T}}
-    normals::Vector{Normal{N,T}}
     weights::Vector{T}
+    normals::Vector{Normal{N,T}}
     elements::Vector{Vector{Int}}
 end
+Quadrature{Q,N,T}() where {Q,N,T}= Quadrature{Q,N,T}([],[],[],[])
+
+quadrature_type(q::Quadrature{Q}) where {Q} = Q
+
+getweights(q::Quadrature) = q.weights
+getnodes(q::Quadrature) = q.nodes
 
 """
     TensorQuadrature{S}
@@ -26,8 +32,11 @@ A singleton type representing a quadrature of size `S`, where `S` is usually a t
 struct TensorQuadrature{S} end
 #NOTE: figure out how to restrict the type parameter `S` above to reinforce it is `NTuple{N,Int} where {N}`
 
+Base.length(q::TensorQuadrature) = length(typeof(q))
+Base.size(q::TensorQuadrature)   = size(typeof(q)) 
 Base.length(::Type{TensorQuadrature{S}}) where {S} = prod(S)
 Base.size(::Type{TensorQuadrature{S}}) where {S} = S
+
 
 """
     _rescale_quadrature(origin,width,algo)
@@ -43,7 +52,12 @@ function _rescale_quadrature(p,origin,width,algo)
     return nodes, weights
 end
 
-function tensorquadrature(el::HyperRectangle{N},p,algo) where {N}
+tensorquadrature(p::NTuple,args...;kwargs...) = tensorquadrature(TensorQuadrature{p}(),args...;kwargs...)
+
+function tensorquadrature(q::TensorQuadrature,el::HyperRectangle,algo)
+    Q = typeof(q)
+    N = ndims(el)
+    p = size(Q)
     nodes1d   = Vector{Vector{Float64}}(undef,N)
     weights1d = Vector{Vector{Float64}}(undef,N)
     for n in 1:N
@@ -53,85 +67,152 @@ function tensorquadrature(el::HyperRectangle{N},p,algo) where {N}
     for (n,node) in enumerate(Iterators.product(nodes1d...))
         nodes[n] = Point(node)
     end
-    weights = Array{Float64,N}(undef,p...)
+    weights = Vector{Float64}(undef,prod(p))
     for (n,weight) in enumerate(Iterators.product(weights1d...))
         weights[n] = prod(weight)
     end
-    return nodes,weights
+    return Quadrature{Q,N,Float64}(nodes,weights,[],[])
 end
 
-function tensorquadrature(geo::ParametricBody{M,N,T},p) where {M,N,T}
-    quad = Quadrature{N,T}([],[],[],p^(N-1))
-    for surf in patches
-        for el in surf.elements
-            el_nodes, el_normals, el_weights = quadgen(surf,el,p)
-            push!(quad.nodes,el_nodes...)
-            push!(quad.weights,el_weights...)
-            push!(quad.normals,el_normals...)
+function tensorquadrature(q::TensorQuadrature,surf::ParametricSurface{M,N,T},algo=gausslegendre) where {M,N,T}
+    Q = typeof(q)
+    quad = Quadrature{Q,N,T}()
+    for element in  getelements(surf)
+        # compute quadrature on reference element
+        push!(quad.elements,[])
+        ref_quad = tensorquadrature(q,element,algo) # quadrature in reference element
+        for (node,weight) in zip(getnodes(ref_quad),getweights(ref_quad))
+            push!(quad.nodes,surf(node))
+            push!(quad.elements[end],length(quad.nodes))
+            jac      = jacobian(surf,node)
+            if N==2
+                jac_det    = norm(jac)
+                normal = [jac[2],-jac[1]]./jac_det
+            elseif N==3
+                tmp = cross(jac[:,1],jac[:,2])
+                jac_det = norm(tmp)
+                normal = tmp./jac_det
+            end
+            push!(quad.normals,normal)
+            push!(quad.weights,jac_det*weight)
         end
     end
     return quad
 end
 
-function tensorquadrature(surf::ParametricSurface{M,N,T}, p, algo=gausslegendre) where {M,N,T}
-    nelements = length(elements(surf))
-    nnodes    = nelements*prod(p)
-    # preallocate vectors
-    nodes     = Vector{Point{N,T}}(undef,nnodes)
-    normals   = Vector{Normal{N,T}}(undef,nnodes)
-    weights   = Vector{T}(undef,nnodes)
-    # compute quadrature on reference element. Note: this assumes the reference elements are the same
-    ref_nodes, ref_weights = tensorquadrature(element,p,algo) # quadrature in reference element
-    quad_elements = Vector{Int}[]
-    inode = 1
-    iel   = 1
-    for element in  elements(surf)
-        for (node,weight) in zip(ref_nodes,ref_weights)
-            nodes[inode] = surf(node)
-            push!(quad_elements[iel],inode)
-            jac      = jacobian(surf,node)
-            if N==2
-                jac_det    = norm(jac)
-                normals[inode] = [jac[2],-jac[1]]./jac_det
-            elseif N==3
-                tmp = cross(jac[:,1],jac[:,2])
-                jac_det = norm(tmp)
-                normals[inode] = tmp./jac_det
+function tensorquadrature(q::TensorQuadrature,geo::ParametricBody{M,N,T},algo=gausslegendre) where {M,N,T}
+    Q = typeof(q)
+    quad = Quadrature{Q,N,T}()
+    for surf in geo.patches
+        for element in  getelements(surf)
+            # compute quadrature on reference element
+            push!(quad.elements,[])
+            ref_quad = tensorquadrature(q,element,algo) # quadrature in reference element
+            for (node,weight) in zip(getnodes(ref_quad),getweights(ref_quad))
+                push!(quad.nodes,surf(node))
+                push!(quad.elements[end],length(quad.nodes))
+                jac      = jacobian(surf,node)
+                if N==2
+                    jac_det    = norm(jac)
+                    normal = [jac[2],-jac[1]]./jac_det
+                elseif N==3
+                    tmp = cross(jac[:,1],jac[:,2])
+                    jac_det = norm(tmp)
+                    normal = tmp./jac_det
+                end
+                push!(quad.normals,normal)
+                push!(quad.weights,jac_det*weight)
             end
-            weights[inode] = jac_det*weight
-            inode +=1
         end
-        iel += 1
     end
-    # create a quadrature type tag
-    Q = TensorQuadrature{p}
-    return Quadrature{Q,3,T}(nodes,weights,normals,quad_elements)
+    return quad
 end
 
-# quadrature for (flat) hyper-rectangle
-function quadgen(domain::HyperRectangle{N},p) where {N}
-    N == 1 && return quad_interval(p,domain)
-    N == 2 && return quad_square(p,domain)
+"""
+    GmshQuadrature
+
+A singleton type representing a quadrature generated by `gmsh`.
+"""
+struct GmshQuadrature end
+
+function gmshquadrature(qtype,dim,tag=-1)
+    N = dim+1
+    Q = GmshQuadrature
+    quad = Quadrature{Q,N,Float64}()
+    etypes, etags, ntags = gmsh.model.mesh.getElements(dim,tag)
+    for i in 1:length(etypes)
+        etype = etypes[i]
+        nels  = length(etags[i])
+        # get reference quadrature on element of type etype
+        ipts, wstd = gmsh.model.mesh.getIntegrationPoints(etype,qtype)
+        points_per_element = length(wstd)
+        eproperty = gmsh.model.mesh.getElementProperties(etype)
+        @info "Generating $qtype quadrature for elements of type $(eproperty[1])"
+        jac, determ, pts = gmsh.model.mesh.getJacobians(etype,ipts,tag)
+        @info nels,length.(etags)
+        jac = reshape(jac,3,3,:)
+        pts = reshape(pts,3,:)
+        normals = jac[:,N,:]
+        # normalize
+        for i=1:size(normals,2)
+            normals[:,i] = normals[:,i]/norm(normals[:,i])
+        end
+        determ = reshape(determ,length(wstd),:)
+        w      = vec(wstd.*determ)
+        npts = length(w)
+        for iel in 1:nels
+            push!(quad.elements,[])
+            for j in 1:points_per_element
+                idx = (iel-1)*points_per_element + j
+                push!(quad.nodes,pts[1:N,idx])
+                push!(quad.normals,normals[1:N,idx])
+                push!(quad.weights,w[idx])
+                push!(quad.elements[end],length(quad.nodes))
+            end
+        end
+    end
+    return quad
 end
 
-function quad_1d(p,origin,width)
-    nodes, weights = gausslegendre(p)
-    #nodes, weights = newtoncotes(p)
-    @. nodes       = nodes*width/2  # shift to [-w/2,w/2]
-    @. nodes       = nodes + width/2 + origin #shift to [a,b]
-    @. weights = weights * width/2
-    return nodes, weights
+################################################################################
+## PLOT RECIPES
+################################################################################
+@recipe function f(quad::Quadrature{<:Any,2})
+    legend --> false
+    grid   --> false
+    aspect_ratio --> :equal
+    nodes    = quad.nodes
+    elements = quad.elements
+    for n in 1:length(elements)
+        el = elements[n]
+        @series begin
+            linecolor --> n
+            pts = nodes[el]
+            x = [pt[1] for pt in pts]
+            y = [pt[2] for pt in pts]
+            x,y
+        end
+    end
 end
 
-function quad_interval(p,hr::HyperRectangle{1,T}) where {T}
-    nodes, weights = quad_1d(p,hr.origin,hr.widths)
-    return Vector{T}(nodes), Vector{T}(weights)
-end
-
-function quad_square(p,hr::HyperRectangle{2,T}) where {T}
-    nodes_x, weights_x  = quad_1d(p,hr.origin[1],hr.widths[1])
-    nodes_y, weights_y  = quad_1d(p,hr.origin[2],hr.widths[2])
-    nodes    = vec([(nx,ny) for nx in nodes_x, ny in nodes_y])
-    weights  = vec([ wx*wy for wx in weights_x, wy in weights_y])
-    return nodes, weights
+@recipe function f(quad::Quadrature{<:Any,3})
+    legend --> false
+    grid   --> false
+    # aspect_ratio --> :equal
+    seriestype := :surface
+    # color  --> :blue
+    linecolor --> :black
+    nodes    = quad.nodes
+    elements = quad.elements
+    for n in 1:length(elements)
+        el = elements[n]
+        @series begin
+            fillcolor --> n
+            pts = nodes[el]
+            x = [pt[1] for pt in pts]
+            y = [pt[2] for pt in pts]
+            z = [pt[3] for pt in pts]
+            x,y,z
+        end
+    end
 end

@@ -5,9 +5,9 @@ function ellipsis(;paxis=ones(2),center=ones(2))
     surf       = ParametricSurface{2}(f,[domain])
     return ParametricBody{2}([surf])
 end
-circle(rad=1,center=ones(2)) = ellipsis(rad*ones(2),center)
+circle(;radius=1,center=ones(2)) = ellipsis(;paxis=radius*ones(2),center=center)
 
-function kite(rad=1,center=ones(2);q=20)
+function kite(;radius=1,center=ones(2))
     f(s) = rad.*[cospi(s[1]) + 0.65*cospi(2*s[1]) - 0.65,
                 1.5*sinpi(s[1])]
     domain = HyperRectangle(-1.0,2.0)
@@ -16,7 +16,7 @@ function kite(rad=1,center=ones(2);q=20)
 end
 
 ######################## 3D ##############################################
-function cube(paxis=ones(3),center=zeros(3))
+function cube(;paxis=ones(3),center=zeros(3))
     nparts = 6
     domain = HyperRectangle(-1.,-1.,2.,2.)
     parts = ParametricSurface{2,3,Float64}[]
@@ -28,7 +28,7 @@ function cube(paxis=ones(3),center=zeros(3))
     return ParametricBody{3}(parts)
 end
 
-function ellipsoid(paxis=ones(3),center=zeros(3))
+function ellipsoid(;paxis=ones(3),center=zeros(3))
     nparts = 6
     domain = HyperRectangle(-1.,-1.,2.,2.)
     parts = ParametricSurface{2,3,Float64}[]
@@ -39,9 +39,9 @@ function ellipsoid(paxis=ones(3),center=zeros(3))
     end
     return ParametricBody{3}(parts)
 end
-sphere(rad=1,center=zeros(3)) = ellipsoid(rad*ones(3),center)
+sphere(;radius=1,center=zeros(3)) = ellipsoid(;paxis=radius*ones(3),center=center)
 
-function bean(paxis=ones(3),center=zeros(3))
+function bean(;paxis=ones(3),center=zeros(3))
     nparts = 6
     domain = HyperRectangle(-1.,-1.,2.,2.)
     parts  = ParametricSurface{2,3,Float64}[]

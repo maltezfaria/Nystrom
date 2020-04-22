@@ -38,6 +38,10 @@ struct GmshParametricSurface{M}
     elements::Vector{HyperRectangle{M,Float64}}
 end
 
+ambient_dim(p::ParametricSurface{M,N}) where {M,N}   = N
+ambient_dim(p::GmshParametricSurface)                = 3 #everything in gmsh is in 3d
+geometric_dim(p::ParametricSurface{M}) where {M}     = M
+geometric_dim(p::GmshParametricSurface{M}) where {M} = M
 
 ParametricSurface{N}(args...) where {N} = ParametricSurface{N-1,N,Float64}(args...)
 
@@ -46,6 +50,8 @@ function GmshParametricSurface(dim::Int,tag::Int,model=gmsh.model.getCurrent())
     rec = HyperRectangle(umin,vmin,umax-umin,vmax-vmin)
     return GmshParametricEntity{dim}(tag,model,[rec])
 end
+
+getelements(surf::ParametricSurface) = surf.elements
 
 (par::ParametricSurface)(x) = par.parametrization(x)
 
@@ -90,7 +96,7 @@ function refine!(surf::ParametricSurface{M},ielem) where {M}
         refine!(surf,ielem,1)
     elseif M == 2
         refine!(surf,ielem,1)
-        n = length(elements(surf))
+        n = length(getelements(surf))
         refine!(surf,ielem,2)
         refine!(surf,n,2)
     else
@@ -106,3 +112,5 @@ function refine!(surf)
         refine!(surf,1)
     end
 end
+
+
