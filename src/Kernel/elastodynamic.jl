@@ -1,12 +1,21 @@
-############################ ELASTODYNAMIC ############################3
-struct Elastodynamic{T}
+################################################################################
+## ELASTOSTATIC
+################################################################################
+struct Elastodynamic{N,T} <: AbstractPDE{N}
     μ::T
     λ::T
     ω::T
     ρ::T
 end
+Elastodynamic(;μ,λ,ω,ρ,ndims=3)                   = Elastodynamic{ndims}(promote(μ,λ,ω,ρ)...)
+Elastodynamic{N}(μ::T,λ::T,ω::T,ρ::T) where {N,T} = Elastodynamic{N,T}(μ,λ,ω,ρ)
+
+default_kernel_type(::Elastodynamic{N}) where {N} = Mat{N,N,ComplexF64,N*N}
+default_density_type(::Elastodynamic{N}) where {N} = Vec{N,ComplexF64}
+
 # Single Layer
-function (SL::SingleLayerKernel{N,T,Op})(x,y)::T  where {N,T,Op<:Elastodynamic}
+function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:Elastodynamic}
+    N = ndims(S)
     x==y && return zero(T)
     μ = SL.op.μ
     λ = SL.op.λ
@@ -22,21 +31,21 @@ function (SL::SingleLayerKernel{N,T,Op})(x,y)::T  where {N,T,Op<:Elastodynamic}
     z2 = s*d/c2
     if N==2
         α = 2
-        ID = Mat2{Float64}(1,0,0,1)
+        ID = Mat{2,2,Float64,4}(1,0,0,1)
         ψ = (-c2/c1 * besselk(1,z1) + besselk(1,z2))/z2 + besselk(0,z2)
         chi = -(c2/c1)^2*(besselk(0,z1) + 2/z1*besselk(1,z1)) + besselk(0,z2) + 2/z2*besselk(1,z2)
     elseif N==3
         α = 4
-        ID    = Mat3{Float64}(1,0,0,0,1,0,0,0,1)
+        ID    = Mat{3,3,Float64,9}(1,0,0,0,1,0,0,0,1)
         ψ     = exp(-z2)/d + (1+z2)/(z2^2)*exp(-z2)/d - c2^2/c1^2*(1+z1)/(z1^2)*exp(-z1)/d
         chi   = 3*ψ - 2*exp(-z2)/d - c2^2/c1^2*exp(-z1)/d
     end
     return 1/(α*π*μ)*(ψ*ID - chi*RRT/d^2)
 end
-SingleLayerKernel{N}(op::Op,args...) where {N,Op<:Elastodynamic} = SingleLayerKernel{N,Mat{N,N,Complex{Float64},N*N},Op}(op,args...)
 
 # Double Layer Kernel
-function (DL::DoubleLayerKernel{N,T,Op})(x,y,ny)::T where {N,T,Op<:Elastodynamic}
+function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:Elastodynamic}
+    N = ndims(S)
     x==y && return zero(T)
     μ = DL.op.μ
     λ = DL.op.λ
@@ -47,12 +56,12 @@ function (DL::DoubleLayerKernel{N,T,Op})(x,y,ny)::T where {N,T,Op<:Elastodynamic
     r = x-y
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
-    drdn = vdot(r,ny)/d
+    drdn = dot(r,ny)/d
     s = -im*ω
     z1 = s*d/c1
     z2 = s*d/c2
     if N==2
-        ID = Mat2{Float64}(1,0,0,1)
+        ID = Mat{2,2,Float64,4}(1,0,0,1)
         α = 2
         ##
         ψ = (-c2/c1 * besselk(1,z1) + besselk(1,z2))/z2 + besselk(0,z2)
@@ -69,7 +78,7 @@ function (DL::DoubleLayerKernel{N,T,Op})(x,y,ny)::T where {N,T,Op<:Elastodynamic
                   )
     elseif N==3
         α = 4
-        ID = Mat3{Float64}(1,0,0,0,1,0,0,0,1)
+        ID = Mat{3,3,Float64,9}(1,0,0,0,1,0,0,0,1)
         ψ    = exp(-z2)/d + (1+z2)/(z2^2)*exp(-z2)/d - c2^2/c1^2*(1+z1)/(z1^2)*exp(-z1)/d
         chi  = 3*ψ - 2*exp(-z2)/d - c2^2/c1^2*exp(-z1)/d
         ψr   = -chi/d - (1+z2)*exp(-z2)/d^2
@@ -80,10 +89,10 @@ function (DL::DoubleLayerKernel{N,T,Op})(x,y,ny)::T where {N,T,Op<:Elastodynamic
                       (c1^2/c2^2 -2)*(ψr - chir - α/2*chi/d)*r*transpose(ny)/d
                     )
 end
-DoubleLayerKernel{N}(op::Op,args...) where {N,Op<:Elastodynamic} = DoubleLayerKernel{N,Mat{N,N,Complex{Float64},N*N},Op}(op,args...)
 
 # Adjoint Double Layer Kernel
-function (ADL::AdjointDoubleLayerKernel{N,T,Op})(x,y,nx)::T where {N,T,Op<:Elastodynamic}
+function (ADL::AdjointDoubleLayerKernel{T,S})(x,y,nx)::T where {T,S<:Elastodynamic}
+    N = ndims(S)
     x==y && return zero(T)
     μ = ADL.op.μ
     λ = ADL.op.λ
@@ -96,12 +105,12 @@ function (ADL::AdjointDoubleLayerKernel{N,T,Op})(x,y,nx)::T where {N,T,Op<:Elast
     RRT = r*transpose(r) # r ⊗ rᵗ
     RNXT = r*transpose(nx)
     NXRT = nx*transpose(r)
-    drdn = vdot(r,nx)/d
+    drdn = dot(r,nx)/d
     s = -im*ω
     z1 = s*d/c1
     z2 = s*d/c2
     if N==2
-        ID = Mat2{Float64}(1,0,0,1)
+        ID = Mat{2,2,Float64,4}(1,0,0,1)
         α = 2
         ##
         ψ = (-c2/c1 * besselk(1,z1) + besselk(1,z2))/z2 + besselk(0,z2)
@@ -118,7 +127,7 @@ function (ADL::AdjointDoubleLayerKernel{N,T,Op})(x,y,nx)::T where {N,T,Op<:Elast
                   )
     elseif N==3
         α = 4
-        ID = Mat3{Float64}(1,0,0,0,1,0,0,0,1)
+        ID = Mat{3,3,Float64,9}(1,0,0,0,1,0,0,0,1)
         ψ    = exp(-z2)/d + (1+z2)/(z2^2)*exp(-z2)/d - c2^2/c1^2*(1+z1)/(z1^2)*exp(-z1)/d
         chi  = 3*ψ - 2*exp(-z2)/d - c2^2/c1^2*exp(-z1)/d
         ψr   = -chi/d - (1+z2)*exp(-z2)/d^2
@@ -129,10 +138,10 @@ function (ADL::AdjointDoubleLayerKernel{N,T,Op})(x,y,nx)::T where {N,T,Op<:Elast
                        λ/μ*( ψr - chir - α/2*chi/d)*NXRT/d
                        )
 end
-AdjointDoubleLayerKernel{N}(op::Op,args...) where {N,Op<:Elastodynamic} = AdjointDoubleLayerKernel{N,Mat{N,N,Complex{Float64},N*N},Op}(op,args...)
 
 # Hypersingular kernel
-function (HS::HypersingularKernel{N,T,Op})(x,y,nx,ny)::T where {N,T,Op<:Elastodynamic}
+function (HS::HyperSingularKernel{T,S})(x,y,nx,ny)::T where {T,S<:Elastodynamic}
+    N = ndims(S)
     x==y && return zero(T)
     μ = HS.op.μ
     λ = HS.op.λ
@@ -143,12 +152,12 @@ function (HS::HypersingularKernel{N,T,Op})(x,y,nx,ny)::T where {N,T,Op<:Elastody
     r = x-y
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
-    drdn = vdot(r,ny)/d
+    drdn = dot(r,ny)/d
     s = -im*ω
     z1 = s*d/c1
     z2 = s*d/c2
     if N==2
-        ID = Mat2{Float64}(1,0,0,1)
+        ID = Mat{2,2,Float64,4}(1,0,0,1)
         α = 2
         ##
         ψ = (-c2/c1 * besselk(1,z1) + besselk(1,z2))/z2 + besselk(0,z2)
@@ -170,7 +179,7 @@ function (HS::HypersingularKernel{N,T,Op})(x,y,nx,ny)::T where {N,T,Op<:Elastody
                     (besselk(0,z2)*z2^2 + 3*besselk(1,z2)*z2 + 6*(besselk(0,z2) + 2/z2*besselk(1,z2))))
     elseif N==3
         α = 4
-        ID = Mat3{Float64}(1,0,0,0,1,0,0,0,1)
+        ID = Mat{3,3,Float64,9}(1,0,0,0,1,0,0,0,1)
         ψ    = exp(-z2)/d + (1+z2)/(z2^2)*exp(-z2)/d - c2^2/c1^2*(1+z1)/(z1^2)*exp(-z1)/d
         chi  = 3*ψ - 2*exp(-z2)/d - c2^2/c1^2*exp(-z1)/d
         ψr   = -chi/d - (1+z2)*exp(-z2)/d^2
@@ -193,4 +202,3 @@ function (HS::HypersingularKernel{N,T,Op})(x,y,nx,ny)::T where {N,T,Op<:Elastody
                               - α/2*ψr/d))*nx*transpose(ny) - 2*(ψr/d -
                               chi/d^2)*(dot(nx,ny)*ID + ny*transpose(nx)) )
 end
-HypersingularKernel{N}(op::Op,args...) where {N,Op<:Elastodynamic} = HypersingularKernel{N,Mat{N,N,Complex{Float64},N*N},Op}(op,args...)

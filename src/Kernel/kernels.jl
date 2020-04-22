@@ -1,26 +1,42 @@
-abstract type AbstractOperator{N} end
-Base.ndims(op::AbstractOperator{N}) where {N} = N
+abstract type AbstractPDE{N} end
 
-abstract type Kernel{T} end
-Base.eltype(K::Kernel{T}) where {T} = T
+Base.ndims(op::AbstractPDE{N}) where {N}       = N
+Base.ndims(::Type{<:AbstractPDE{N}}) where {N} = N
 
-struct SingleLayerKernel{N,T,Op} <: Kernel{N,T}
+abstract type AbstractKernel{T} end
+return_type(K::AbstractKernel{T}) where {T} = T
+
+struct SingleLayerKernel{T,Op} <: AbstractKernel{T}
     op::Op
 end
-SingleLayerKernel{N,T}(op) where {N,T} = SingleLayerKernel{N,T,typeof(op)}(op)
+SingleLayerKernel{T}(op) where {T} = SingleLayerKernel{T,typeof(op)}(op)
+SingleLayerKernel(op)              = SingleLayerKernel{default_kernel_type(op)}(op)
 
-struct DoubleLayerKernel{N,T,Op} <: Kernel{N,T}
+struct DoubleLayerKernel{T,Op} <: AbstractKernel{T}
     op::Op
 end
-DoubleLayerKernel{N,T}(op) where {N,T} = DoubleLayerKernel{N,T,typeof(op)}(op)
+DoubleLayerKernel{T}(op) where {T} = DoubleLayerKernel{T,typeof(op)}(op)
+DoubleLayerKernel(op)              = DoubleLayerKernel{default_kernel_type(op)}(op)
 
-struct AdjointDoubleLayerKernel{N,T,Op} <: Kernel{N,T}
+struct AdjointDoubleLayerKernel{T,Op} <: AbstractKernel{T}
     op::Op
 end
-AdjointDoubleLayerKernel{N,T}(op) where {N,T} = AdjointDoubleLayerKernel{N,T,typeof(op)}(op)
+AdjointDoubleLayerKernel{T}(op) where {T} = AdjointDoubleLayerKernel{T,typeof(op)}(op)
+AdjointDoubleLayerKernel(op)              = AdjointDoubleLayerKernel{default_kernel_type(op)}(op)
 
-struct HypersingularKernel{N,T,Op} <: Kernel{N,T}
+struct HyperSingularKernel{T,Op} <: AbstractKernel{T}
     op::Op
 end
-HypersingularKernel{N,T}(op) where {N,T} = HypersingularKernel{N,T,typeof(op)}(op)
+HyperSingularKernel{T}(op) where {T} = HyperSingularKernel{T,typeof(op)}(op)
+HyperSingularKernel(op)              = HyperSingularKernel{default_kernel_type(op)}(op)
 
+# kernel trait do distinguish various integral operators and potentials. This helps in dispatch.
+struct SingleLayer end
+struct DoubleLayer end
+struct AdjointDoubleLayer end
+struct HyperSingular end
+
+kernel_type(::SingleLayerKernel)        = SingleLayer()
+kernel_type(::DoubleLayerKernel)        = DoubleLayer()
+kernel_type(::AdjointDoubleLayerKernel) = AdjointDoubleLayer()
+kernel_type(::HyperSingularKernel)      = HyperSingular()

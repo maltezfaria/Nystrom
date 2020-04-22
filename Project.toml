@@ -11,6 +11,7 @@ GmshTools = "82e2f556-b1bd-5f1a-9576-f93c0da5f0ee"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
+SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 
 [compat]
 julia = "^1"

@@ -23,6 +23,10 @@ quadrature_type(q::Quadrature{Q}) where {Q} = Q
 
 getweights(q::Quadrature) = q.weights
 getnodes(q::Quadrature) = q.nodes
+getnormals(q::Quadrature) = q.normals
+getelements(q::Quadrature) = q.elements
+
+Base.length(q::Quadrature) = length(getnodes(q))
 
 """
     TensorQuadrature{S}
@@ -149,7 +153,6 @@ function gmshquadrature(qtype,dim,tag=-1)
         eproperty = gmsh.model.mesh.getElementProperties(etype)
         @info "Generating $qtype quadrature for elements of type $(eproperty[1])"
         jac, determ, pts = gmsh.model.mesh.getJacobians(etype,ipts,tag)
-        @info nels,length.(etags)
         jac = reshape(jac,3,3,:)
         pts = reshape(pts,3,:)
         normals = jac[:,N,:]

@@ -1,10 +1,20 @@
-############################ ELASTOSTATIC ############################3
-struct Elastostatic{T}
+################################################################################
+## ELASTOSTATIC
+################################################################################
+
+struct Elastostatic{N,T} <: AbstractPDE{N}
     μ::T
     λ::T
 end
+Elastostatic(;μ,λ,ndims=3)             = Elastostatic{ndims}(promote(μ,λ)...)
+Elastostatic{N}(μ::T,λ::T) where {N,T} = Elastostatic{N,T}(μ,λ)
+
+default_kernel_type(::Elastostatic{N}) where {N} = Mat{N,N,Float64,N*N}
+default_density_type(::Elastostatic{N}) where {N} = Vec{N,Float64}
+
 # Single Layer
-function (SL::SingleLayerKernel{N,T,Op})(x,y)::T  where {N,T,Op<:Elastostatic}
+function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:Elastostatic}
+    N = ndims(S)
     x==y && return zero(T)
     μ = SL.op.μ
     λ = SL.op.λ
@@ -13,17 +23,17 @@ function (SL::SingleLayerKernel{N,T,Op})(x,y)::T  where {N,T,Op<:Elastostatic}
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
     if N==2
-        ID = Mat2{Float64}(1,0,0,1)
+        ID = Mat{2,2,Float64,4}(1,0,0,1)
         return 1/(8π*μ*(1-ν))*(-(3-4*ν)*log(d)*ID + RRT/d^2)
     elseif N==3
-        ID = Mat3{Float64}(1,0,0,0,1,0,0,0,1)
+        ID = Mat{3,3,Float64,9}(1,0,0,0,1,0,0,0,1)
         return 1/(16π*μ*(1-ν)*d)*((3-4*ν)*ID + RRT/d^2)
     end
 end
-SingleLayerKernel{N}(op::Op,args...) where {N,Op<:Elastostatic} = SingleLayerKernel{N,Mat{N,N,Float64,N*N},Op}(op,args...)
 
 # Double Layer Kernel
-function (DL::DoubleLayerKernel{N,T,Op})(x,y,ny)::T where {N,T,Op<:Elastostatic}
+function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:Elastostatic}
+    N = ndims(S)
     x==y && return zero(T)
     μ = DL.op.μ
     λ = DL.op.λ
@@ -31,7 +41,7 @@ function (DL::DoubleLayerKernel{N,T,Op})(x,y,ny)::T where {N,T,Op<:Elastostatic}
     r = x-y
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
-    drdn = vdot(r,ny)/d
+    drdn = dot(r,ny)/d
     if N==2
         ID = Mat2{Float64}(1,0,0,1)
         return -1/(4π*(1-ν)*d)*(drdn*((1-2ν)*ID + 2*RRT/d^2) - (1-2ν)/d*(r*transpose(ny) - ny*transpose(r)))
@@ -40,10 +50,10 @@ function (DL::DoubleLayerKernel{N,T,Op})(x,y,ny)::T where {N,T,Op<:Elastostatic}
         return -1/(8π*(1-ν)*d^2)*(drdn * ((1-2*ν)*ID + 3*RRT/d^2) - (1-2*ν)/d*(r*transpose(ny) - ny*transpose(r)))
     end
 end
-DoubleLayerKernel{N}(op::Op,args...) where {N,Op<:Elastostatic} = DoubleLayerKernel{N,Mat{N,N,Float64,N*N},Op}(op,args...)
 
 # Adjoint Double Layer Kernel
-function (ADL::AdjointDoubleLayerKernel{N,T,Op})(x,y,nx)::T where {N,T,Op<:Elastostatic}
+function (ADL::AdjointDoubleLayerKernel{T,S})(x,y,nx)::T where {T,S<:Elastostatic}
+    N = ndims(S)
     x==y && return zero(T)
     μ = ADL.op.μ
     λ = ADL.op.λ
@@ -53,16 +63,15 @@ function (ADL::AdjointDoubleLayerKernel{N,T,Op})(x,y,nx)::T where {N,T,Op<:Elast
     RRT = r*transpose(r) # r ⊗ rᵗ
     if N==2
         ID = Mat2{Float64}(1,0,0,1)
-        return 1/(4π*(1-ν)*d)*((1-2ν)/d*(-nx*transpose(r) + vdot(r,nx)*ID + r*transpose(nx)) + 2/d^3*vdot(r,nx)*RRT)
+        return 1/(4π*(1-ν)*d)*((1-2ν)/d*(-nx*transpose(r) + dot(r,nx)*ID + r*transpose(nx)) + 2/d^3*dot(r,nx)*RRT)
     elseif N==3
         ID = Mat3{Float64}(1,0,0,0,1,0,0,0,1)
-        return 1/(8π*(1-ν)*d^2)*((1-2ν)/d*(-nx*transpose(r) + vdot(r,nx)*ID + r*transpose(nx)) + 3/d^3*vdot(r,nx)*RRT)
+        return 1/(8π*(1-ν)*d^2)*((1-2ν)/d*(-nx*transpose(r) + dot(r,nx)*ID + r*transpose(nx)) + 3/d^3*dot(r,nx)*RRT)
     end
 end
-AdjointDoubleLayerKernel{N}(op::Op,args...) where {N,Op<:Elastostatic} = AdjointDoubleLayerKernel{N,Mat{N,N,Float64,N*N},Op}(op,args...)
 
 # Hypersingular kernel
-function (HS::HypersingularKernel{N,T,Op})(x,y,nx,ny)::T where {N,T,Op<:Elastostatic}
+function (HS::HyperSingularKernel{T,S})(x,y,nx,ny)::T where {T,S<:Elastostatic}
     x==y && return zero(T)
     μ = HS.op.μ
     λ = HS.op.λ
@@ -70,21 +79,20 @@ function (HS::HypersingularKernel{N,T,Op})(x,y,nx,ny)::T where {N,T,Op<:Elastost
     r = x-y
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
-    drdn    = vdot(r,ny)/d
+    drdn    = dot(r,ny)/d
     if N==2
         ID = Mat2{Float64}(1,0,0,1)
-        return μ/(2π*(1-ν)*d^2)* (2*drdn/d*( (1-2ν)*nx*transpose(r) + ν*(vdot(r,nx)*ID + r*transpose(nx)) - 4*vdot(r,nx)*RRT/d^2 ) +
-                                  2*ν/d^2*(vdot(r,nx)*ny*transpose(r) + vdot(nx,ny)*RRT) +
-                                  (1-2*ν)*(2/d^2*vdot(r,nx)*r*transpose(ny) + vdot(nx,ny)*ID + ny*transpose(nx)) -
+        return μ/(2π*(1-ν)*d^2)* (2*drdn/d*( (1-2ν)*nx*transpose(r) + ν*(dot(r,nx)*ID + r*transpose(nx)) - 4*dot(r,nx)*RRT/d^2 ) +
+                                  2*ν/d^2*(dot(r,nx)*ny*transpose(r) + dot(nx,ny)*RRT) +
+                                  (1-2*ν)*(2/d^2*dot(r,nx)*r*transpose(ny) + dot(nx,ny)*ID + ny*transpose(nx)) -
                                   (1-4ν)*nx*transpose(ny)
                                   )
     elseif N==3
         ID = Mat3{Float64}(1,0,0,0,1,0,0,0,1)
-        return μ/(4π*(1-ν)*d^3)* (3*drdn/d*( (1-2ν)*nx*transpose(r) + ν*(vdot(r,nx)*ID + r*transpose(nx)) - 5*vdot(r,nx)*RRT/d^2 ) +
-                                  3*ν/d^2*(vdot(r,nx)*ny*transpose(r) + vdot(nx,ny)*RRT) +
-                                  (1-2*ν)*(3/d^2*vdot(r,nx)*r*transpose(ny) + vdot(nx,ny)*ID + ny*transpose(nx)) -
+        return μ/(4π*(1-ν)*d^3)* (3*drdn/d*( (1-2ν)*nx*transpose(r) + ν*(dot(r,nx)*ID + r*transpose(nx)) - 5*dot(r,nx)*RRT/d^2 ) +
+                                  3*ν/d^2*(dot(r,nx)*ny*transpose(r) + dot(nx,ny)*RRT) +
+                                  (1-2*ν)*(3/d^2*dot(r,nx)*r*transpose(ny) + dot(nx,ny)*ID + ny*transpose(nx)) -
                                   (1-4ν)*nx*transpose(ny)
                                   )
     end
 end
-HypersingularKernel{N}(op::Op,args...) where {N,Op<:Elastostatic} = HypersingularKernel{N,Mat{N,N,Float64,N*N},Op}(op,args...)

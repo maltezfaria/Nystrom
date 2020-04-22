@@ -27,13 +27,13 @@ function (DL::DoubleLayerKernel{N,T,Op})(x,y,ny)::T where {N,T,Op<:Stokes}
     d = norm(r)
     if N==2
         x==y && return zero(T)
-        return 1/π * vdot(r,ny)/d^4 .* r*transpose(r)
+        return 1/π * dot(r,ny)/d^4 .* r*transpose(r)
 
     elseif N==3
         x==y && return zero(T)
         ID = Mat3{Float64}(1,0,0,0,1,0,0,0,1)
         RRT = r*transpose(r) # r ⊗ rᵗ
-        return 3/(4π) * vdot(r,ny)/d^5 .* RRT
+        return 3/(4π) * dot(r,ny)/d^5 .* RRT
     end
 end
 DoubleLayerKernel{N}(op::Op,args...) where {N,Op<:Stokes} = DoubleLayerKernel{N,Mat{N,N,Float64,N*N},Op}(op,args...)
@@ -47,29 +47,29 @@ function (HS::AdjointDoubleLayerKernel{N,T,Op})(x,y,ny)::T where {N,T,Op<:Stokes
     d = norm(r)
     if N==2
         x==y && return zero(T)
-        return -1/π * vdot(r,ny)/d^4 .* r*transpose(r)
+        return -1/π * dot(r,ny)/d^4 .* r*transpose(r)
     elseif N==3
         x==y && return zero(T)
         ID = Mat3{Float64}(1,0,0,0,1,0,0,0,1)
         RRT = r*transpose(r) # r ⊗ rᵗ
-        return -3/(4π) * vdot(r,ny)/d^5 .* RRT
+        return -3/(4π) * dot(r,ny)/d^5 .* RRT
     end
 end
 AdjointDoubleLayerKernel{N}(op::Op,args...) where {N,Op<:Stokes} = AdjointDoubleLayerKernel{N,Mat{N,N,Float64,N*N},Op}(op,args...)
 
 # Hypersingular
-function (DL::HypersingularKernel{N,T,Op})(x,y,nx,ny)::T where {N,T,Op<:Stokes}
+function (DL::HyperSingularKernel{N,T,Op})(x,y,nx,ny)::T where {N,T,Op<:Stokes}
     μ = DL.op.μ
     r = x-y
     d = norm(r)
     if N==2
         x==y && return zero(T)
-        return -1/π * vdot(r,ny)/d^4 .* r*transpose(r)
+        return -1/π * dot(r,ny)/d^4 .* r*transpose(r)
     elseif N==3
         x==y && return zero(T)
         ID = Mat3{Float64}(1,0,0,0,1,0,0,0,1)
         RRT = r*transpose(r) # r ⊗ rᵗ
-        return -3/(4π) * vdot(r,ny)/d^5 .* RRT
+        return -3/(4π) * dot(r,ny)/d^5 .* RRT
     end
 end
-HypersingularKernel{N}(op::Op,args...) where {N,Op<:Stokes} = HypersingularKernel{N,Mat{N,N,Float64,N*N},Op}(op,args...)
+HyperSingularKernel{N}(op::Op,args...) where {N,Op<:Stokes} = HyperSingularKernel{N,Mat{N,N,Float64,N*N},Op}(op,args...)

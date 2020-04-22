@@ -1,10 +1,18 @@
-############################ Helmholtz ############################
-struct Helmholtz{N,T}
+################################################################################
+## HELMHOLTZ
+################################################################################
+
+struct Helmholtz{N,T} <: AbstractPDE{N}
     k::T
 end
-Helmholtz(;k,dim=3) = Laplace{dim,typeof(k)}(k)
+Helmholtz(;k,ndims=3) = Helmholtz{ndims,typeof(k)}(k)
+
+default_kernel_type(::Helmholtz) = ComplexF64
+default_density_type(::Helmholtz{N}) where {N} = ComplexF64
+
 # Single Layer
-function (SL::SingleLayerKernel{N,T,Op})(x,y)::T  where {N,T,Op<:Helmholtz}
+function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:Helmholtz}
+    N = ndims(S)
     x==y && return zero(T)
     k = SL.op.k
     r = x-y
@@ -16,10 +24,10 @@ function (SL::SingleLayerKernel{N,T,Op})(x,y)::T  where {N,T,Op<:Helmholtz}
         return 1/(4π)/d * exp(im*k*d)
     end
 end
-SingleLayerKernel{N}(op::Op,args...) where {N,Op<:Helmholtz} = SingleLayerKernel{N,ComplexF64,Op}(op,args...)
 
 # Double Layer Kernel
-function (DL::DoubleLayerKernel{N,T,Op})(x,y,ny)::T where {N,T,Op<:Helmholtz}
+function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:Helmholtz}
+    N = ndims(S)
     x==y && return 0
     k = DL.op.k
     r = x-y
@@ -28,27 +36,27 @@ function (DL::DoubleLayerKernel{N,T,Op})(x,y,ny)::T where {N,T,Op<:Helmholtz}
     if N==2
         return im*k/4/d * hankelh1(1,k*d) .* dot(r,ny)
     elseif N==3
-        return 1/(4π)/d^2 * exp(im*k*d) * ( -im*k + 1/d ) * vdot(r,ny)
+        return 1/(4π)/d^2 * exp(im*k*d) * ( -im*k + 1/d ) * dot(r,ny)
     end
 end
-DoubleLayerKernel{N}(op::Op,args...) where {N,Op<:Helmholtz} = DoubleLayerKernel{N,ComplexF64,Op}(op,args...)
 
 # Adjoint double Layer Kernel
-function (ADL::AdjointDoubleLayerKernel{N,T,Op})(x,y,nx)::T where {N,T,Op<:Helmholtz}
+function (ADL::AdjointDoubleLayerKernel{T,S})(x,y,nx)::T where {T,S<:Helmholtz}
+    N = ndims(S)
     x==y && return 0
     k = ADL.op.k
     r = x-y
     d = norm(r)
     if N==2
-        return -im*k/4/d * hankelh1(1,k*d) .* vdot(r,nx)
+        return -im*k/4/d * hankelh1(1,k*d) .* dot(r,nx)
     elseif N==3
-        return -1/(4π)/d^2 * exp(im*k*d) * ( -im*k + 1/d ) * vdot(r,nx)
+        return -1/(4π)/d^2 * exp(im*k*d) * ( -im*k + 1/d ) * dot(r,nx)
     end
 end
-AdjointDoubleLayerKernel{N}(op::Op,args...) where {N,Op<:Helmholtz} = AdjointDoubleLayerKernel{N,ComplexF64,Op}(op,args...)
 
 # Hypersingular kernel
-function (HS::HypersingularKernel{N,T,Op})(x,y,nx,ny)::T where {N,T,Op<:Helmholtz}
+function (HS::HyperSingularKernel{T,S})(x,y,nx,ny)::T where {T,S<:Helmholtz}
+    N = ndims(S)
     x==y && return 0
     k = HS.op.k
     r = x-y
@@ -66,4 +74,3 @@ function (HS::HypersingularKernel{N,T,Op})(x,y,nx,ny)::T where {N,T,Op<:Helmholt
         return  transpose(nx)*(term1 + term2) * ny
     end
 end
-HypersingularKernel{N}(op::Op,args...) where {N,Op<:Helmholtz} = HypersingularKernel{N,ComplexF64,Op}(op,args...)

@@ -1,7 +1,8 @@
 module Nystrom
 
-using GeometryTypes: Point, Normal, HyperRectangle
+using GeometryTypes: Point, Normal, HyperRectangle, Mat
 using LinearAlgebra
+using SpecialFunctions
 using RecipesBase
 using GmshTools
 
@@ -25,7 +26,28 @@ export
     Elastostatic,
     Elastodynamic,
     Stokes,
-    Maxwell
+    Maxwell,
+    # kernels
+    SingleLayerKernel,
+    DoubleLayerKernel,
+    AdjointDoubleLayerKernel,
+    HyperSingularKernel,
+    # density
+    SurfaceDensity,
+    # potentials
+    SingleLayerPotential,
+    DoubleLayerPotential,
+    IntegralPotential,
+    # trace 
+    γ₀,
+    γ₁,
+    # integral operators
+    IntegralOperator,
+    SingleLayerOperator,
+    DoubleLayerOperator,
+    AdjointDoubleLayerOperator,
+    HyperSingularOperator
+
 
 ################################################################################
 ## GEOMETRY
@@ -47,8 +69,8 @@ include("Kernel/laplace.jl")
 include("Kernel/helmholtz.jl")
 include("Kernel/elastostatic.jl")
 include("Kernel/elastodynamic.jl")
-include("Kernel/stokes.jl")
-include("Kernel/maxwell.jl")
+# include("Kernel/stokes.jl")
+# include("Kernel/maxwell.jl")
 
 ################################################################################
 ## POTENTIALS
@@ -58,7 +80,7 @@ include("Potentials/potentials.jl")
 ################################################################################
 ## OPERATORS
 ################################################################################
-# include("Operators/integraloperators.jl")
+include("Operators/integraloperators.jl")
 # include("Operators/corrections.jl")
 
 ################################################################################
