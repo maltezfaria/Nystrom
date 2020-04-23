@@ -19,7 +19,9 @@ struct Quadrature{Q,N,T}
 end
 Quadrature{Q,N,T}() where {Q,N,T}= Quadrature{Q,N,T}([],[],[],[])
 
-quadrature_type(q::Quadrature{Q}) where {Q} = Q
+ambient_dimension(q::Quadrature{Q,N}) where {Q,N}   = N
+geometric_dimension(q::Quadrature{Q,N}) where {Q,N} = geometric_dimension(Q)
+quadrature_type(q::Quadrature{Q}) where {Q}         = Q
 
 getweights(q::Quadrature) = q.weights
 getnodes(q::Quadrature) = q.nodes
@@ -43,10 +45,13 @@ Base.size(::Type{TensorQuadrature{S}}) where {S} = S
 
 
 """
-    _rescale_quadrature(origin,width,algo)
+    _rescale_quadrature(p,origin,width,algo)
 
 Convenience method to rescale the `p` points 1d quadrature rule `algo` from
-`[-1,1]` to an interval given by `[origin,origin+width]`
+`[-1,1]` to an interval given by `[origin,origin+width]`.
+
+It is assume that `algo` is callable in the following: `nodes,weights =
+algo(p)`, where `nodes` and `weights` are vectors.
 """
 function _rescale_quadrature(p,origin,width,algo)
     nodes, weights = algo(p)
@@ -78,7 +83,7 @@ function tensorquadrature(q::TensorQuadrature,el::HyperRectangle,algo)
     return Quadrature{Q,N,Float64}(nodes,weights,[],[])
 end
 
-function tensorquadrature(q::TensorQuadrature,surf::ParametricSurface{M,N,T},algo=gausslegendre) where {M,N,T}
+function tensorquadrature(q::TensorQuadrature,surf::ParametricSurface{M,N,T},algo) where {M,N,T}
     Q = typeof(q)
     quad = Quadrature{Q,N,T}()
     for element in  getelements(surf)
@@ -104,7 +109,7 @@ function tensorquadrature(q::TensorQuadrature,surf::ParametricSurface{M,N,T},alg
     return quad
 end
 
-function tensorquadrature(q::TensorQuadrature,geo::ParametricBody{M,N,T},algo=gausslegendre) where {M,N,T}
+function tensorquadrature(q::TensorQuadrature,geo::ParametricBody{M,N,T},algo) where {M,N,T}
     Q = typeof(q)
     quad = Quadrature{Q,N,T}()
     for surf in geo.patches

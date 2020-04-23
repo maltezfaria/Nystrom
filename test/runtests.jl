@@ -31,12 +31,13 @@ using SafeTestsets
             k    = Vec(1,2)
             f(x) = exp(im*(k⋅x))
             σ    = γ₀(f,quad)
-            Nystrom.∇(::typeof(f)) = (x)->im.*k.*f(x) #need to define the gradient
+            Nystrom.γ₁(::typeof(f)) = (x,n) -> dot(im.*k.*f(x),n) #need to define the γ₁ for you function
             σ    = γ₁(f,quad)
-            S = SingleLayerOperator(op,quad,quad)
-            D = DoubleLayerOperator(op,quad,quad)
+            S  = SingleLayerOperator(op,quad,quad)
+            D  = DoubleLayerOperator(op,quad,quad)
             AD = AdjointDoubleLayerOperator(op,quad,quad)
-            AD = AdjointDoubleLayerOperator(op,quad,quad)
+            H  = HyperSingularOperator(op,quad,quad)
+            
         end
     end
 end

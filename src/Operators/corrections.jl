@@ -1,12 +1,20 @@
-struct IOpCorrection{N,T,T2,T3,Tmesh} <: AbstractMatrix{T}
+"""
+    GreensCorrection{T,S} <: AbstractMatrix{T}
+
+An `AbstractMatrix` representing a correction to a singular boundary integral
+operator using density interpolation method with Greens functions [^1]
+
+[^1] TODO: CITE OUR PAPER
+"""
+struct GreensCorrection{T,S} <: AbstractMatrix{T}
     γ₀B::Array{T,2}
     γ₁B::Array{T,2}
-    L::Vector{T2}
-    R::Array{T3,2} #integrated contribution of correction
-    quad::Quadrature{N,Tmesh}
+    L::Vector{Matrix{T}}
+    R::Array{S,2} #integrated contribution of correction
+    # quad::Quadrature{N,Tmesh}
 end
 
-function IOpCorrection(IOp::IntegralOperator{N,T}, Op1, Op2, xₛ, σ = 0.5) where {N,T}
+function GreensCorrection(IOp::IntegralOperator{N,T}, Op1, Op2, xₛ, σ = 0.5) where {N,T}
     op          = IOp.kernel.op
     quad        = IOp.quad
     SL_kernel   = SingleLayerKernel{N}(op)
@@ -39,10 +47,10 @@ function IOpCorrection(IOp::IntegralOperator{N,T}, Op1, Op2, xₛ, σ = 0.5) whe
     else
         R  = Op2*γ₀B - Op1*γ₁B + σ*γ₁B
     end
-    return IOpCorrection(γ₀B,γ₁B,L,R,quad)
+    return GreensCorrection(γ₀B,γ₁B,L,R,quad)
 end
 
-function (corr::IOpCorrection)(φ::AbstractVector{T},α,β) where T
+function (corr::GreensCorrection)(φ::AbstractVector{T},α,β) where T
     quad = corr.quad
     qsize = quad.nodes_per_element
     out = zero(φ)
@@ -66,7 +74,7 @@ function (corr::IOpCorrection)(φ::AbstractVector{T},α,β) where T
     return out
 end
 
-# function Base.getindex(corr::IOpCorrection{N,T},i::Int,j::Int) where {N,T}
+# function Base.getindex(corr::GreensCorrection{N,T},i::Int,j::Int) where {N,T}
 #     if abs(i-j) >= corr.quad.nodes_per_element
 #         return zero(T)
 #     else

@@ -1,3 +1,9 @@
+"""
+    IntegralOperator{T,K,S,V} <: AbstractMatrix{T}
+
+Representation of an integral operator which takes a density ϕ defined on `Y`
+and integrates it with `kernel` for all elements `x ∈ X`.
+"""
 struct IntegralOperator{T,K,S,V} <: AbstractMatrix{T}
     kernel::K
     X::S

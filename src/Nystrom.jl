@@ -17,6 +17,7 @@ export
     sphere,
     ellipsoid,
     bean,
+    refine!,
     # quadrature
     tensorquadrature,
     gmshquadrature,
@@ -38,7 +39,7 @@ export
     SingleLayerPotential,
     DoubleLayerPotential,
     IntegralPotential,
-    # trace 
+    # trace
     γ₀,
     γ₁,
     # integral operators
@@ -81,11 +82,12 @@ include("Potentials/potentials.jl")
 ## OPERATORS
 ################################################################################
 include("Operators/integraloperators.jl")
-# include("Operators/corrections.jl")
+include("Operators/corrections.jl")
 
 ################################################################################
 ## UTILS
 ################################################################################
+include("Utils/testutils.jl")
 # include("Utils/math.jl")
 # include("Utils/conversions.jl")
 # include("Utils/utils.jl")

@@ -18,11 +18,8 @@ function γ₀(f,X)
     return SurfaceDensity(vals,X)
 end
 
-#FIXME
-function ∇ end
-
-function γ₁(f,X)
-    vals = [∇(f)(x)⋅n for (x,n) in zip(getnodes(X),getnormals(X))]
+function γ₁(dfdn,X)
+    vals = [dfdn(x,n) for (x,n) in zip(getnodes(X),getnormals(X))]
     return SurfaceDensity(vals,X)
 end
 
