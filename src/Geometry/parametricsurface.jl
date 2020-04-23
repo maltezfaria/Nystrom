@@ -108,8 +108,8 @@ end
 #refine all elements in all directions
 function refine!(surf)
     n = length(surf.elements)
-    for _ in 1:n
-        refine!(surf,1)
+    for i in 1:n
+        refine!(surf,i)
     end
 end
 
