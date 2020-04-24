@@ -19,9 +19,9 @@ struct Quadrature{Q,N,T}
 end
 Quadrature{Q,N,T}() where {Q,N,T}= Quadrature{Q,N,T}([],[],[],[])
 
-ambient_dimension(q::Quadrature{Q,N}) where {Q,N}   = N
-geometric_dimension(q::Quadrature{Q,N}) where {Q,N} = geometric_dimension(Q)
-quadrature_type(q::Quadrature{Q}) where {Q}         = Q
+ambient_dim(q::Quadrature{Q,N}) where {Q,N}   = N
+geometric_dim(q::Quadrature{Q,N}) where {Q,N} = geometric_dim(Q)
+quadrature_type(q::Quadrature{Q}) where {Q}   = Q
 
 getweights(q::Quadrature)  = q.weights
 getnodes(q::Quadrature)    = q.nodes
