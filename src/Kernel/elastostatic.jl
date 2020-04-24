@@ -43,10 +43,10 @@ function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:Elastostatic}
     RRT = r*transpose(r) # r ⊗ rᵗ
     drdn = dot(r,ny)/d
     if N==2
-        ID = Mat2{Float64}(1,0,0,1)
+        ID = Mat{2,2,Float64,4}(1,0,0,1)
         return -1/(4π*(1-ν)*d)*(drdn*((1-2ν)*ID + 2*RRT/d^2) - (1-2ν)/d*(r*transpose(ny) - ny*transpose(r)))
     elseif N==3
-        ID = Mat3{Float64}(1,0,0,0,1,0,0,0,1)
+        ID = Mat{3,3,Float64,9}(1,0,0,0,1,0,0,0,1)
         return -1/(8π*(1-ν)*d^2)*(drdn * ((1-2*ν)*ID + 3*RRT/d^2) - (1-2*ν)/d*(r*transpose(ny) - ny*transpose(r)))
     end
 end
@@ -62,16 +62,17 @@ function (ADL::AdjointDoubleLayerKernel{T,S})(x,y,nx)::T where {T,S<:Elastostati
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
     if N==2
-        ID = Mat2{Float64}(1,0,0,1)
+        ID = Mat{2,2,Float64,4}(1,0,0,1)
         return 1/(4π*(1-ν)*d)*((1-2ν)/d*(-nx*transpose(r) + dot(r,nx)*ID + r*transpose(nx)) + 2/d^3*dot(r,nx)*RRT)
     elseif N==3
-        ID = Mat3{Float64}(1,0,0,0,1,0,0,0,1)
+        ID = Mat{3,3,Float64,9}(1,0,0,0,1,0,0,0,1)
         return 1/(8π*(1-ν)*d^2)*((1-2ν)/d*(-nx*transpose(r) + dot(r,nx)*ID + r*transpose(nx)) + 3/d^3*dot(r,nx)*RRT)
     end
 end
 
 # Hypersingular kernel
 function (HS::HyperSingularKernel{T,S})(x,y,nx,ny)::T where {T,S<:Elastostatic}
+    N = ndims(S)
     x==y && return zero(T)
     μ = HS.op.μ
     λ = HS.op.λ
@@ -81,14 +82,14 @@ function (HS::HyperSingularKernel{T,S})(x,y,nx,ny)::T where {T,S<:Elastostatic}
     RRT = r*transpose(r) # r ⊗ rᵗ
     drdn    = dot(r,ny)/d
     if N==2
-        ID = Mat2{Float64}(1,0,0,1)
+        ID = Mat{2,2,Float64,4}(1,0,0,1)
         return μ/(2π*(1-ν)*d^2)* (2*drdn/d*( (1-2ν)*nx*transpose(r) + ν*(dot(r,nx)*ID + r*transpose(nx)) - 4*dot(r,nx)*RRT/d^2 ) +
                                   2*ν/d^2*(dot(r,nx)*ny*transpose(r) + dot(nx,ny)*RRT) +
                                   (1-2*ν)*(2/d^2*dot(r,nx)*r*transpose(ny) + dot(nx,ny)*ID + ny*transpose(nx)) -
                                   (1-4ν)*nx*transpose(ny)
                                   )
     elseif N==3
-        ID = Mat3{Float64}(1,0,0,0,1,0,0,0,1)
+        ID = Mat{3,3,Float64,9}(1,0,0,0,1,0,0,0,1)
         return μ/(4π*(1-ν)*d^3)* (3*drdn/d*( (1-2ν)*nx*transpose(r) + ν*(dot(r,nx)*ID + r*transpose(nx)) - 5*dot(r,nx)*RRT/d^2 ) +
                                   3*ν/d^2*(dot(r,nx)*ny*transpose(r) + dot(nx,ny)*RRT) +
                                   (1-2*ν)*(3/d^2*dot(r,nx)*r*transpose(ny) + dot(nx,ny)*ID + ny*transpose(nx)) -

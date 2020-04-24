@@ -29,10 +29,10 @@ using SafeTestsets
             @test u(y) == 0
             @test v(y) == 0
             k    = Vec(1,2)
-            f(x) = exp(im*(k⋅x))
+            f    = (x) -> exp(im*(k⋅x))
             σ    = γ₀(f,quad)
-            Nystrom.γ₁(::typeof(f)) = (x,n) -> dot(im.*k.*f(x),n) #need to define the γ₁ for you function
-            σ    = γ₁(f,quad)
+            dfdn = (x,n) -> dot(im.*k.*f(x),n) #need to define the γ₁ for you function
+            σ    = γ₁(dfdn,quad)
             S  = SingleLayerOperator(op,quad,quad)
             D  = DoubleLayerOperator(op,quad,quad)
             AD = AdjointDoubleLayerOperator(op,quad,quad)

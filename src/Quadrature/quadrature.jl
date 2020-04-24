@@ -23,12 +23,88 @@ ambient_dimension(q::Quadrature{Q,N}) where {Q,N}   = N
 geometric_dimension(q::Quadrature{Q,N}) where {Q,N} = geometric_dimension(Q)
 quadrature_type(q::Quadrature{Q}) where {Q}         = Q
 
-getweights(q::Quadrature) = q.weights
-getnodes(q::Quadrature) = q.nodes
-getnormals(q::Quadrature) = q.normals
+getweights(q::Quadrature)  = q.weights
+getnodes(q::Quadrature)    = q.nodes
+getnormals(q::Quadrature)  = q.normals
 getelements(q::Quadrature) = q.elements
 
 Base.length(q::Quadrature) = length(getnodes(q))
+
+"""
+    near_interaction_list(X::Quadrature,Y::Quadrature;[tol],)
+
+Return a vector of `length(X)` elements, where each element contains the index
+in `Y` of nodes for which `norm(x-y)<tol`. For points which belong to the same
+element in `Y`, only the closest one is returned.
+"""
+function near_interaction_list(X::Quadrature,Y::Quadrature; tol=0, hfactor=tol>0 ? 0 : 5)
+    n = length(X)
+    list = [Vector{Tuple{Int,Int}}() for _ = 1:n]
+    for i in 1:n
+        x = getnodes(X)[i]
+        for (n,yel) in enumerate(getelements(Y))
+            d = map(y -> norm(x-y),getnodes(Y)[yel])
+            dmin,idx_min = findmin(d)
+            hloc = local_mesh_size(Y,n,yel[idx_min])
+            if dmin < max(hfactor*hloc,tol)
+                push!(list[i],(n,yel[idx_min]))
+            end
+        end
+    end
+    return list
+end
+
+function _prune_interaction_list!(list,X,Y)
+    for i in 1:length(X)
+        x = getnodes(X)[i]
+        isempty(list[i]) && continue
+        dmin,nmin,jmin = Inf,-1,-1
+        for (n,j) in list[i]
+            y = getnodes(Y)[j]
+            d = norm(x - y) 
+            if d < dmin 
+                dmin = d
+                nmin = n
+                jmin = j
+            end
+        end
+        list[i] = [(nmin,jmin)]
+    end
+    return list
+end
+
+
+function local_mesh_size(Y,iel,inode)
+    idxs  = getelements(Y)[iel]
+    nodes = getnodes(Y)
+    ymin  = nodes[inode]
+    hloc  = mapreduce(min,idxs) do j
+        if ymin == nodes[j]
+            h = Inf
+        else
+            h = norm(ymin-nodes[j])
+        end
+        return h
+    end
+    return hloc
+end
+
+"""
+    idx_nodes_to_elements(q::Quadrature)
+
+For each node in `q`, return the indices of the elements to which it belongs.
+
+Depending on the quadrature type, more efficient methods can be defined and overloaded if needed.
+"""
+function idx_nodes_to_elements(q::Quadrature)
+    list = [Int[] for _ in 1:length(q)]
+    for n in 1:length(getelements(q))
+        for i in getelements(q)[n]
+            push!(list[i],n)
+        end
+    end
+    return list
+end
 
 """
     TensorQuadrature{S}

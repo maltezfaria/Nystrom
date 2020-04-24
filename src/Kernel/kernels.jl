@@ -40,3 +40,9 @@ kernel_type(::SingleLayerKernel)        = SingleLayer()
 kernel_type(::DoubleLayerKernel)        = DoubleLayer()
 kernel_type(::AdjointDoubleLayerKernel) = AdjointDoubleLayer()
 kernel_type(::HyperSingularKernel)      = HyperSingular()
+
+combined_field_coefficients(::SingleLayerKernel)        = (0,-1)
+combined_field_coefficients(::DoubleLayerKernel)        = (1,0)
+combined_field_coefficients(::AdjointDoubleLayerKernel) = (0,-1)
+combined_field_coefficients(::HyperSingularKernel)      = (1,0)
+

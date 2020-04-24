@@ -47,7 +47,9 @@ export
     SingleLayerOperator,
     DoubleLayerOperator,
     AdjointDoubleLayerOperator,
-    HyperSingularOperator
+    HyperSingularOperator,
+    # corrections to integral operators
+    GreensCorrection
 
 
 ################################################################################
@@ -88,6 +90,7 @@ include("Operators/corrections.jl")
 ## UTILS
 ################################################################################
 include("Utils/testutils.jl")
+include("Utils/geometryutils.jl")
 # include("Utils/math.jl")
 # include("Utils/conversions.jl")
 # include("Utils/utils.jl")
