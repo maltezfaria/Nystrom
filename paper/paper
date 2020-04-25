@@ -1,0 +1,11 @@
+  /home/lfaria/projects/Nystrom/paper:
+  total used in directory 20 available 366053660
+  drwxr-xr-x  2 lfaria lfaria 4096 juin  21 13:01 .
+  drwxr-xr-x 13 lfaria lfaria 4096 juin  20 10:46 ..
+  -rw-r--r--  1 lfaria lfaria 3239 juin  21 10:23 convergence_greens.jl
+  drwxrwxr-x  2 lfaria lfaria 4096 juin  21 13:13 figures
+C -rw-r--r--  1 lfaria lfaria 3177 juin  21 13:05 figure1b.jl
+C -rw-r--r--  1 lfaria lfaria 3282 juin  21 13:18 figure1c.jl
+C -rw-r--r--  1 lfaria lfaria 3282 juin  21 13:18 figure2a.jl
+  -rw-r--r--  1 lfaria lfaria 3177 juin  21 13:05 figure1a.jl
+C -rw-r--r--  1 lfaria lfaria 3168 juin  21 13:00 figure2.jl

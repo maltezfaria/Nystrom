@@ -7,7 +7,7 @@ struct Elastodynamic{N,T} <: AbstractPDE{N}
     ω::T
     ρ::T
 end
-Elastodynamic(;μ,λ,ω,ρ,ndims=3)                   = Elastodynamic{ndims}(promote(μ,λ,ω,ρ)...)
+Elastodynamic(;μ,λ,ω,ρ,dim=3)                   = Elastodynamic{dim}(promote(μ,λ,ω,ρ)...)
 Elastodynamic{N}(μ::T,λ::T,ω::T,ρ::T) where {N,T} = Elastodynamic{N,T}(μ,λ,ω,ρ)
 
 default_kernel_type(::Elastodynamic{N}) where {N} = Mat{N,N,ComplexF64,N*N}
@@ -15,7 +15,7 @@ default_density_type(::Elastodynamic{N}) where {N} = Vec{N,ComplexF64}
 
 # Single Layer
 function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:Elastodynamic}
-    N = ndims(S)
+    N = ambient_dim(S)
     x==y && return zero(T)
     μ = SL.op.μ
     λ = SL.op.λ
@@ -45,7 +45,7 @@ end
 
 # Double Layer Kernel
 function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:Elastodynamic}
-    N = ndims(S)
+    N = ambient_dim(S)
     x==y && return zero(T)
     μ = DL.op.μ
     λ = DL.op.λ
@@ -92,7 +92,7 @@ end
 
 # Adjoint Double Layer Kernel
 function (ADL::AdjointDoubleLayerKernel{T,S})(x,y,nx)::T where {T,S<:Elastodynamic}
-    N = ndims(S)
+    N = ambient_dim(S)
     x==y && return zero(T)
     μ = ADL.op.μ
     λ = ADL.op.λ
@@ -141,7 +141,7 @@ end
 
 # Hypersingular kernel
 function (HS::HyperSingularKernel{T,S})(x,y,nx,ny)::T where {T,S<:Elastodynamic}
-    N = ndims(S)
+    N = ambient_dim(S)
     x==y && return zero(T)
     μ = HS.op.μ
     λ = HS.op.λ

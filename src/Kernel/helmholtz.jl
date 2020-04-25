@@ -5,14 +5,14 @@
 struct Helmholtz{N,T} <: AbstractPDE{N}
     k::T
 end
-Helmholtz(;k,ndims=3) = Helmholtz{ndims,typeof(k)}(k)
+Helmholtz(;k,dim=3) = Helmholtz{dim,typeof(k)}(k)
 
 default_kernel_type(::Helmholtz) = ComplexF64
 default_density_type(::Helmholtz{N}) where {N} = ComplexF64
 
 # Single Layer
 function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:Helmholtz}
-    N = ndims(S)
+    N = ambient_dim(S)
     x==y && return zero(T)
     k = SL.op.k
     r = x-y
@@ -27,7 +27,7 @@ end
 
 # Double Layer Kernel
 function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:Helmholtz}
-    N = ndims(S)
+    N = ambient_dim(S)
     x==y && return 0
     k = DL.op.k
     r = x-y
@@ -42,7 +42,7 @@ end
 
 # Adjoint double Layer Kernel
 function (ADL::AdjointDoubleLayerKernel{T,S})(x,y,nx)::T where {T,S<:Helmholtz}
-    N = ndims(S)
+    N = ambient_dim(S)
     x==y && return 0
     k = ADL.op.k
     r = x-y
@@ -56,7 +56,7 @@ end
 
 # Hypersingular kernel
 function (HS::HyperSingularKernel{T,S})(x,y,nx,ny)::T where {T,S<:Helmholtz}
-    N = ndims(S)
+    N = ambient_dim(S)
     x==y && return 0
     k = HS.op.k
     r = x-y

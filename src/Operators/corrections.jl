@@ -67,9 +67,11 @@ function GreensCorrection(iop::IntegralOperator{T,K}, basis, γ₁_basis) where 
     if kernel_type(iop) isa Union{SingleLayer,DoubleLayer}
         SL = IntegralOperator{T}(SingleLayerKernel(op),X,Y) |> Matrix
         DL = IntegralOperator{T}(DoubleLayerKernel(op),X,Y) |> Matrix
-        R  = error_interior_greens_identity(SL,DL,γ₀B,γ₁B)
+        R  = error_interior_green_identity(SL,DL,γ₀B,γ₁B)
     elseif kernel_type(iop) isa Union{AdjointDoubleLayer,HyperSingular}
-        R  = error_interior_derivative_greens_identity(op,γ₀B,γ₁B)
+        ADL = IntegralOperator{T}(AdjointDoubleLayerKernel(op),X,Y) |> Matrix
+        H   = IntegralOperator{T}(HyperSingularKernel(op),X,Y) |> Matrix
+        R  = error_interior_derivative_green_identity(ADL,H,γ₀B,γ₁B)
     end
 
     # compute the interpolation matrix
@@ -94,10 +96,12 @@ function GreensCorrection(iop::IntegralOperator{T,K}, basis, γ₁_basis) where 
     return GreensCorrection{T}(kernel,X,Y,w,idx_near)
 end
 
-error_interior_greens_identity(SL,DL,γ₀u,γ₁u)            = -γ₀u/2 + SL*γ₁u - DL*γ₀u
-error_interior_derivative_greens_identity(ADL,H,γ₀u,γ₁u) = -γ₁u/2 + ADL*γ₁u - H*γ₀u
-error_exterior_greens_identity(SL,DL,γ₀u,γ₁u)            = γ₀u/2 + SL*γ₁u - DL*γ₀u
-error_exterior_derivative_greens_identity(SL,DL,γ₀u,γ₁u) = γ₁u/2 + ADL*γ₁u - H*γ₀u
+error_green_formula(SL,DL,γ₀u,γ₁u,σ)                      = σ*γ₀u/2 + SL*γ₁u - DL*γ₀u 
+error_derivative_green_formula(SL,DL,γ₀u,γ₁u,σ)           = σ*γ₁u/2 + SL*γ₁u - DL*γ₀u 
+error_interior_green_identity(SL,DL,γ₀u,γ₁u)              = error_green_formula(SL,DL,γ₀u,γ₁u,-1/2)
+error_interior_derivative_green_identity(ADL,H,γ₀u,γ₁u)   = error_derivative_green_formula(ADL,H,γ₀u,γ₁u,-1/2)
+error_exterior_greens_identity(SL,DL,γ₀u,γ₁u)             = error_green_formula(SL,DL,γ₀u,γ₁u,1/2)
+error_exterior_derivative_greens_identity(ADL,H,γ₀u,γ₁u)  = error_derivative_green_formula(ADL,H,γ₀u,γ₁u,-1/2)
 
 # function OldGreensCorrection(iop,)
 #     idx_el2n    = getelements(Y)

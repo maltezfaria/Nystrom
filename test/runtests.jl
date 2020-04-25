@@ -6,10 +6,10 @@ using SafeTestsets
     using Nystrom, GeometryTypes, FastGaussQuadrature, LinearAlgebra
     x = rand(Point{2,Float64})
     y = rand(Point{2,Float64})
-    op = Laplace(ndims=2)
-    op = Helmholtz(ndims=2,k=1)
-    op = Elastostatic(ndims=2,μ=1,λ=1)
-    op = Elastodynamic(ndims=2,μ=1,λ=1,ω=1,ρ=1.0)
+    op = Laplace(dim=2)
+    op = Helmholtz(dim=2,k=1)
+    op = Elastostatic(dim=2,μ=1,λ=1)
+    op = Elastodynamic(dim=2,μ=1,λ=1,ω=1,ρ=1.0)
     G = SingleLayerKernel(op)
     G(x,y)
     dG = DoubleLayerKernel(op)
@@ -19,7 +19,7 @@ using SafeTestsets
         @testset "Helmholtz" begin
             geo  = circle()
             quad = tensorquadrature((20,),geo,gausslegendre)
-            op = Helmholtz(ndims=2,k=1)
+            op = Helmholtz(dim=2,k=1)
             𝒮 = IntegralPotential(op,quad,:singlelayer)
             𝒮 = SingleLayerPotential(op,quad)
             𝒟 = DoubleLayerPotential(op,quad)
@@ -37,7 +37,6 @@ using SafeTestsets
             D  = DoubleLayerOperator(op,quad,quad)
             AD = AdjointDoubleLayerOperator(op,quad,quad)
             H  = HyperSingularOperator(op,quad,quad)
-            
         end
     end
 end

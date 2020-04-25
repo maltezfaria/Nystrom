@@ -48,7 +48,7 @@ ParametricSurface{N}(args...) where {N} = ParametricSurface{N-1,N,Float64}(args.
 function GmshParametricSurface(dim::Int,tag::Int,model=gmsh.model.getCurrent())
     (umin,vmin),(umax,vmax) = gmsh.model.getParametrizationBounds(dim,tag)
     rec = HyperRectangle(umin,vmin,umax-umin,vmax-vmin)
-    return GmshParametricEntity{dim}(tag,model,[rec])
+    return GmshParametricSurface{dim}(tag,model,[rec])
 end
 
 getelements(surf::ParametricSurface) = surf.elements

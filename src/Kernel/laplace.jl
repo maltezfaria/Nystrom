@@ -2,7 +2,7 @@
 ## LAPLACE
 ################################################################################
 struct Laplace{N} <: AbstractPDE{N} end
-Laplace(;ndims=3) = Laplace{ndims}()
+Laplace(;dim=3) = Laplace{dim}()
 
 default_kernel_type(::Laplace) = Float64
 default_density_type(::Laplace{N}) where {N} = Float64

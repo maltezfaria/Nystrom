@@ -6,7 +6,7 @@ struct Elastostatic{N,T} <: AbstractPDE{N}
     μ::T
     λ::T
 end
-Elastostatic(;μ,λ,ndims=3)             = Elastostatic{ndims}(promote(μ,λ)...)
+Elastostatic(;μ,λ,dim=3)             = Elastostatic{dim}(promote(μ,λ)...)
 Elastostatic{N}(μ::T,λ::T) where {N,T} = Elastostatic{N,T}(μ,λ)
 
 default_kernel_type(::Elastostatic{N}) where {N} = Mat{N,N,Float64,N*N}
@@ -14,7 +14,7 @@ default_density_type(::Elastostatic{N}) where {N} = Vec{N,Float64}
 
 # Single Layer
 function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:Elastostatic}
-    N = ndims(S)
+    N = ambient_dim(S)
     x==y && return zero(T)
     μ = SL.op.μ
     λ = SL.op.λ
@@ -33,7 +33,7 @@ end
 
 # Double Layer Kernel
 function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:Elastostatic}
-    N = ndims(S)
+    N = ambient_dim(S)
     x==y && return zero(T)
     μ = DL.op.μ
     λ = DL.op.λ
@@ -53,7 +53,7 @@ end
 
 # Adjoint Double Layer Kernel
 function (ADL::AdjointDoubleLayerKernel{T,S})(x,y,nx)::T where {T,S<:Elastostatic}
-    N = ndims(S)
+    N = ambient_dim(S)
     x==y && return zero(T)
     μ = ADL.op.μ
     λ = ADL.op.λ
@@ -72,7 +72,7 @@ end
 
 # Hypersingular kernel
 function (HS::HyperSingularKernel{T,S})(x,y,nx,ny)::T where {T,S<:Elastostatic}
-    N = ndims(S)
+    N = ambient_dim(S)
     x==y && return zero(T)
     μ = HS.op.μ
     λ = HS.op.λ

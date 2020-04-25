@@ -1,0 +1,30 @@
+Figure 1 --> Greens identities in 2d
+       1a --> Laplace + Helmholtz
+       1b --> Elastostatic + Elastodynamics
+       1c --> Derivative of Laplace + Helmholtz
+       1d --> Derivative of Elastostatic + Elastodynamics
+
+Figure 2 --> Greens identities in 3d
+       2a --> Laplace + Helmholtz
+       2b --> Elastostatic + Elastodynamics
+       2c --> Derivative of Laplace + Helmholtz
+       2d --> Derivative of Elastostatic + Elastodynamics
+
+Figure 3 --> Interior problem with exact solution as source outside
+       3a --> Direct formulation for interior Neumann with point source
+       3b --> Direct formulation for interior Dirichlet with point source
+
+Figure 4 --> Number of gmres iterations for Interior problem as k increases
+       4a --> Direct formulation for interior Neumann 
+       4b --> Direct formulation for interior Dirichlet
+
+Figure 5 --> Sensitivity of solution to location of sources points
+       5a --> Vary radius of circle where  sources are located
+       5b --> Vary center of circle where sources are located
+       5c --> Vary radius of sphere where  sources are located 
+       5d --> Vary center of sphere where sources are located
+
+Figure 6 --> Scattering by plane wave using CFIE
+       6a --> 2d soundsoft circle
+       6b --> 3d soundsoft sphere
+

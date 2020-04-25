@@ -1,7 +1,7 @@
 abstract type AbstractPDE{N} end
 
-Base.ndims(op::AbstractPDE{N}) where {N}       = N
-Base.ndims(::Type{<:AbstractPDE{N}}) where {N} = N
+ambient_dim(op::AbstractPDE{N}) where {N}       = N
+ambient_dim(::Type{<:AbstractPDE{N}}) where {N} = N
 
 abstract type AbstractKernel{T} end
 return_type(K::AbstractKernel{T}) where {T} = T

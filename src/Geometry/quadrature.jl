@@ -16,9 +16,8 @@ struct Quadrature{Q,N,T}
     weights::Vector{T}
     normals::Vector{Normal{N,T}}
     elements::Vector{Vector{Int}}
-    bodies::Vector{Vector{Int}}
 end
-Quadrature{Q,N,T}() where {Q,N,T}= Quadrature{Q,N,T}([],[],[],[],[])
+Quadrature{Q,N,T}() where {Q,N,T}= Quadrature{Q,N,T}([],[],[],[])
 
 ambient_dim(q::Quadrature{Q,N}) where {Q,N}   = N
 geometric_dim(q::Quadrature{Q,N}) where {Q,N} = geometric_dim(Q)
@@ -28,7 +27,6 @@ getweights(q::Quadrature)  = q.weights
 getnodes(q::Quadrature)    = q.nodes
 getnormals(q::Quadrature)  = q.normals
 getelements(q::Quadrature) = q.elements
-getbodies(q::Quadrature) = q.elements
 
 Base.length(q::Quadrature) = length(getnodes(q))
 
@@ -41,17 +39,15 @@ element in `Y`, only the closest one is returned.
 """
 function near_interaction_list(X::Quadrature,Y::Quadrature; tol=0, hfactor=tol>0 ? 0 : 5)
     n = length(X)
-    list = [Vector{Tuple{Int,Int,Int}}() for _ = 1:n]
+    list = [Vector{Tuple{Int,Int}}() for _ = 1:n]
     for i in 1:n
         x = getnodes(X)[i]
-        for (nbdy,bdy) in getbodies(Y)
-            for (n,yel) in enumerate(bdy)
-                d = map(y -> norm(x-y),getnodes(Y)[yel])
-                dmin,idx_min = findmin(d)
-                hloc = local_mesh_size(Y,n,yel[idx_min])
-                if dmin < max(hfactor*hloc,tol)
-                    push!(list[i],(n,yel[idx_min]))
-                end
+        for (n,yel) in enumerate(getelements(Y))
+            d = map(y -> norm(x-y),getnodes(Y)[yel])
+            dmin,idx_min = findmin(d)
+            hloc = local_mesh_size(Y,n,yel[idx_min])
+            if dmin < max(hfactor*hloc,tol)
+                push!(list[i],(n,yel[idx_min]))
             end
         end
     end
@@ -160,94 +156,7 @@ function tensorquadrature(q::TensorQuadrature,el::HyperRectangle,algo)
     for (n,weight) in enumerate(Iterators.product(weights1d...))
         weights[n] = prod(weight)
     end
-    return Quadrature{Q,N,Float64}(nodes,weights,[],[],[])
-end
-
-function tensorquadrature(q::TensorQuadrature,surf::ParametricSurface{M,N,T},algo) where {M,N,T}
-    Q = typeof(q)
-    quad = Quadrature{Q,N,T}()
-    for element in  getelements(surf)
-        # compute quadrature on reference element
-        push!(quad.elements,[])
-        ref_quad = tensorquadrature(q,element,algo) # quadrature in reference element
-        for (node,weight) in zip(getnodes(ref_quad),getweights(ref_quad))
-            push!(quad.nodes,surf(node))
-            push!(quad.elements[end],length(quad.nodes))
-            jac      = jacobian(surf,node)
-            if N==2
-                jac_det    = norm(jac)
-                normal = [jac[2],-jac[1]]./jac_det
-            elseif N==3
-                tmp = cross(jac[:,1],jac[:,2])
-                jac_det = norm(tmp)
-                normal = tmp./jac_det
-            end
-            push!(quad.normals,normal)
-            push!(quad.weights,jac_det*weight)
-        end
-    end
-    return quad
-end
-
-function tensorquadrature(q::TensorQuadrature,bdy::ParametricBody{M,N,T},algo) where {M,N,T}
-    Q = typeof(q)
-    quad = Quadrature{Q,N,T}()
-    for surf in bdy.patches
-        for element in  getelements(surf)
-            # compute quadrature on reference element
-            push!(quad.elements,[])
-            ref_quad = tensorquadrature(q,element,algo) # quadrature in reference element
-            for (node,weight) in zip(getnodes(ref_quad),getweights(ref_quad))
-                push!(quad.nodes,surf(node))
-                push!(quad.elements[end],length(quad.nodes))
-                jac      = jacobian(surf,node)
-                if N==2
-                    jac_det    = norm(jac)
-                    normal = [jac[2],-jac[1]]./jac_det
-                elseif N==3
-                    tmp = cross(jac[:,1],jac[:,2])
-                    jac_det = norm(tmp)
-                    normal = tmp./jac_det
-                end
-                push!(quad.normals,normal)
-                push!(quad.weights,jac_det*weight)
-            end
-        end
-    end
-    push!(quad.bodies,1:length(quad.elements)|>collect)
-    return quad
-end
-
-function tensorquadrature(q::TensorQuadrature,geo::Vector{ParametricBody{M,N,T}},algo) where {M,N,T}
-    Q = typeof(q)
-    quad = Quadrature{Q,N,T}()
-    for bdy in geo
-        push!(quad.bodies,[])
-        for surf in bdy.patches
-            for element in  getelements(surf)
-                # compute quadrature on reference element
-                push!(quad.elements,[])
-                ref_quad = tensorquadrature(q,element,algo) # quadrature in reference element
-                for (node,weight) in zip(getnodes(ref_quad),getweights(ref_quad))
-                    push!(quad.nodes,surf(node))
-                    push!(quad.elements[end],length(quad.nodes))
-                    jac      = jacobian(surf,node)
-                    if N==2
-                        jac_det    = norm(jac)
-                        normal = [jac[2],-jac[1]]./jac_det
-                    elseif N==3
-                        tmp = cross(jac[:,1],jac[:,2])
-                        jac_det = norm(tmp)
-                        normal = tmp./jac_det
-                    end
-                    push!(quad.normals,normal)
-                    push!(quad.weights,jac_det*weight)
-                end
-                push!(quad.bodies[end],length(quad.elements))
-            end
-        end
-    end
-    return quad
+    return Quadrature{Q,N,Float64}(nodes,weights,[],[])
 end
 
 """
