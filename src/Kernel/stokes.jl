@@ -6,7 +6,7 @@ end
 function (SL::SingleLayerKernel{N,T,Op})(x,y)::T  where {N,T,Op<:Stokes}
     x==y && return zero(T)
     μ = SL.op.μ
-    r = x-y
+    r = x .- y
     d = norm(r)
     RRT = r*transpose(r)
     if N==2
@@ -23,7 +23,7 @@ SingleLayerKernel{N}(op::Op,args...) where {N,Op<:Stokes} = SingleLayerKernel{N,
 # Double Layer Kernel
 function (DL::DoubleLayerKernel{N,T,Op})(x,y,ny)::T where {N,T,Op<:Stokes}
     μ = DL.op.μ
-    r = x-y
+    r = x .- y
     d = norm(r)
     if N==2
         x==y && return zero(T)
@@ -43,7 +43,7 @@ DoubleLayerKernel{N}(op::Op,args...) where {N,Op<:Stokes} = DoubleLayerKernel{N,
 # Adjoint Double Layer Kernel
 function (HS::AdjointDoubleLayerKernel{N,T,Op})(x,y,ny)::T where {N,T,Op<:Stokes}
     μ = HS.op.μ
-    r = x-y
+    r = x .- y
     d = norm(r)
     if N==2
         x==y && return zero(T)
@@ -60,7 +60,7 @@ AdjointDoubleLayerKernel{N}(op::Op,args...) where {N,Op<:Stokes} = AdjointDouble
 # Hypersingular
 function (DL::HyperSingularKernel{N,T,Op})(x,y,nx,ny)::T where {N,T,Op<:Stokes}
     μ = DL.op.μ
-    r = x-y
+    r = x .- y
     d = norm(r)
     if N==2
         x==y && return zero(T)

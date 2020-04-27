@@ -10,7 +10,7 @@ function fig_gen()
     fig       = plot(yscale=:log10,xscale=:log10,xlabel="#dof",ylabel="error")
     qorder    = (2,3,4)
     h0        = 0.1
-    niter     = 4
+    niter     = 6
     operators = (Laplace(dim=2),Helmholtz(dim=2,k=2π))
     for op in operators
         # construct interior solution
@@ -45,8 +45,8 @@ function fig_gen()
                 push!(dof,length(Γ))
                 refine!(Γ)
             end
-            plot!(fig,dof,ee_interior,label=Nystrom.getname(op)*": p=$p",m=:x)
-            # plot!(fig,dof,ee_exterior,label="op = $op, p=$p",m=:o)
+            # plot!(fig,dof,ee_interior,label=Nystrom.getname(op)*": p=$p",m=:x)
+            plot!(fig,dof,ee_exterior,label=Nystrom.getname(op)*": p=$p",m=:o)
         end
     end
     return fig

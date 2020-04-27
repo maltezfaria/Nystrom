@@ -36,7 +36,7 @@ end
 # Adjoint double Layer Kernel
 function (ADL::AdjointDoubleLayerKernel{T,Laplace{N}})(x,y,nx)::T where {N,T}
     x==y && return zero(T)
-    r = x-y
+    r = x .- y
     d = sqrt(sum(r.^2))
     if N==2
         return -1/(2π)/(d^2) .* dot(r,nx)
@@ -48,7 +48,7 @@ end
 # Hypersingular kernel
 function (HS::HyperSingularKernel{T,Laplace{N}})(x,y,nx,ny)::T where {N,T}
     x==y && return zero(T)
-    r = x-y
+    r = x .- y
     d = sqrt(sum(r.^2))
     if N==2
         ID = Mat{2,2,Float64,4}(1,0,0,1)

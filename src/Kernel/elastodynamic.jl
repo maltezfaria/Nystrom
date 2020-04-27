@@ -10,6 +10,8 @@ end
 Elastodynamic(;μ,λ,ω,ρ,dim=3)                   = Elastodynamic{dim}(promote(μ,λ,ω,ρ)...)
 Elastodynamic{N}(μ::T,λ::T,ω::T,ρ::T) where {N,T} = Elastodynamic{N,T}(μ,λ,ω,ρ)
 
+getname(::Elastodynamic) = "Elastodynamic"
+
 default_kernel_type(::Elastodynamic{N}) where {N} = Mat{N,N,ComplexF64,N*N}
 default_density_type(::Elastodynamic{N}) where {N} = Vec{N,ComplexF64}
 
@@ -23,7 +25,7 @@ function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:Elastodynamic}
     ρ = SL.op.ρ
     c1 = sqrt((λ + 2μ)/ρ)
     c2 = sqrt(μ/ρ)
-    r = x-y
+    r = x .- y
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
     s = -im*ω
@@ -53,7 +55,7 @@ function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:Elastodynamic}
     ρ = DL.op.ρ
     c1 = sqrt((λ + 2μ)/ρ)
     c2 = sqrt(μ/ρ)
-    r = x-y
+    r = x .- y
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
     drdn = dot(r,ny)/d
@@ -100,7 +102,7 @@ function (ADL::AdjointDoubleLayerKernel{T,S})(x,y,nx)::T where {T,S<:Elastodynam
     ρ = ADL.op.ρ
     c1 = sqrt((λ + 2μ)/ρ)
     c2 = sqrt(μ/ρ)
-    r = x-y
+    r = x .- y
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
     RNXT = r*transpose(nx)
@@ -149,7 +151,7 @@ function (HS::HyperSingularKernel{T,S})(x,y,nx,ny)::T where {T,S<:Elastodynamic}
     ρ = HS.op.ρ
     c1 = sqrt((λ + 2μ)/ρ)
     c2 = sqrt(μ/ρ)
-    r = x-y
+    r = x .- y
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
     drdn = dot(r,ny)/d

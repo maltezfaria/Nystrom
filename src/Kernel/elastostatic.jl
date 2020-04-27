@@ -9,6 +9,8 @@ end
 Elastostatic(;μ,λ,dim=3)             = Elastostatic{dim}(promote(μ,λ)...)
 Elastostatic{N}(μ::T,λ::T) where {N,T} = Elastostatic{N,T}(μ,λ)
 
+getname(::Elastostatic) = "Elastostatic"
+
 default_kernel_type(::Elastostatic{N}) where {N} = Mat{N,N,Float64,N*N}
 default_density_type(::Elastostatic{N}) where {N} = Vec{N,Float64}
 
@@ -19,7 +21,7 @@ function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:Elastostatic}
     μ = SL.op.μ
     λ = SL.op.λ
     ν = λ/(2*(μ+λ))
-    r = x-y
+    r = x .- y
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
     if N==2
@@ -38,7 +40,7 @@ function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:Elastostatic}
     μ = DL.op.μ
     λ = DL.op.λ
     ν = λ/(2*(μ+λ))
-    r = x-y
+    r = x .- y
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
     drdn = dot(r,ny)/d
@@ -58,7 +60,7 @@ function (ADL::AdjointDoubleLayerKernel{T,S})(x,y,nx)::T where {T,S<:Elastostati
     μ = ADL.op.μ
     λ = ADL.op.λ
     ν = λ/(2*(μ+λ))
-    r = x-y
+    r = x .- y
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
     if N==2
@@ -77,7 +79,7 @@ function (HS::HyperSingularKernel{T,S})(x,y,nx,ny)::T where {T,S<:Elastostatic}
     μ = HS.op.μ
     λ = HS.op.λ
     ν = λ/(2*(μ+λ))
-    r = x-y
+    r = x .- y
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
     drdn    = dot(r,ny)/d

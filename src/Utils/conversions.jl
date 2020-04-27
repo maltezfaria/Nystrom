@@ -13,9 +13,18 @@ end
 
 function matrix_to_tensor(T,A::Matrix)
     sblock = size(T)
-    ss     = div.(size(A),sblock)
-    Ablock = Matrix{T}(undef,ss)
-    
+    nblock = div.(size(A),sblock)
+    Ablock = Matrix{T}(undef,nblock)
+    for i in 1:nblock[1]
+        istart = (i-1)*sblock[1] + 1
+        iend = i*sblock[1]
+        for j in 1:nblock[2]
+            jstart = (j-1)*sblock[2] + 1
+            jend   = j*sblock[2]
+            Ablock[i,j] = A[istart:iend,jstart:jend]
+        end
+    end
+    return Ablock
 end
 
 # function fill_matrix(IOp::IntegralOperator{N,T})  where {N,T}

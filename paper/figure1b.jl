@@ -16,13 +16,14 @@ function fig_gen()
     p  = qorder[1]
     for op in operators
         # construct interior solution
+        c    = rand(dim)
         xout = (4,3)
-        u    = (x)   -> SingleLayerKernel(op)(xout,x)
-        dudn = (x,n) -> DoubleLayerKernel(op)(xout,x,n)
+        u    = (x)   -> SingleLayerKernel(op)(xout,x)*c
+        dudn = (x,n) -> transpose(DoubleLayerKernel(op)(xout,x,n))*c
         # construct exterior solution
-        xin  = (-.1,0.2)
-        v    = (x)   -> SingleLayerKernel(op)(xin,x)
-        dvdn = (x,n) -> DoubleLayerKernel(op)(xin,x,n)
+        xin  = (0.3,0.2)
+        v    = (x)   -> SingleLayerKernel(op)(xin,x)*c
+        dvdn = (x,n) -> DoubleLayerKernel(op)(xin,x,n)*c
         for p in qorder
             meshgen!(Γ,h0)
             ee_interior = []
@@ -43,18 +44,19 @@ function fig_gen()
                 γ₀v       = γ₀(v,Γ)
                 γ₁v       = γ₁(dvdn,Γ)
                 ee = error_exterior_green_identity(S+δS,D+δD,γ₀v,γ₁v)
+                norm(ee,Inf)
                 push!(ee_exterior,norm(ee,Inf)/norm(γ₀v,Inf))
                 push!(dof,length(Γ))
                 refine!(Γ)
             end
             plot!(fig,dof,ee_interior,label=Nystrom.getname(op)*": p=$p",m=:x)
-            # plot!(fig,dof,ee_exterior,label="op = $op, p=$p",m=:o)
+            # plot!(fig,dof,ee_exterior,label=Nystrom.getname(op)*": p=$p",m=:x)
         end
     end
     return fig
 end
 
 fig = fig_gen()
-fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1a.svg"
+fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1b.svg"
 savefig(fig,fname)
 display(fig)

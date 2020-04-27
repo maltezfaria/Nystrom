@@ -46,7 +46,6 @@ function Base.setindex!(c::GreensCorrection,v,i::Int,j::Int)
 end
 
 function GreensCorrection(iop::IntegralOperator{T,K}, basis, γ₁_basis) where {T,K}
-    σ = 0.5
     kernel,X,Y  = iop.kernel, iop.X, iop.Y
     op          = kernel.op
     m,n         = length(X),length(Y)
@@ -88,7 +87,7 @@ function GreensCorrection(iop::IntegralOperator{T,K}, basis, γ₁_basis) where 
             L[1:nnear,:]     = γ₀B[yels,:]
             L[nnear+1:end,:] = γ₁B[yels,:]
             invL = invert_green_matrix(L)
-            w[i] = (R[idx_node:idx_node,:]*invL)*D |> vec
+            w[i]        = (R[idx_node:idx_node,:]*invL)*D |> vec
             idx_near[i] = copy(yels)
             #NOTE: making a copy is important here or you get issues when
             #mutating the GreesCorrection since mutating the non-zero indices of
@@ -98,35 +97,38 @@ function GreensCorrection(iop::IntegralOperator{T,K}, basis, γ₁_basis) where 
     return GreensCorrection{T}(kernel,X,Y,w,idx_near)
 end
 
-function invert_green_matrix(L)
-    T = eltype(L) |> eltype
-    rtol = sqrt(eps(real(float(one(T)))))
+function invert_green_matrix(L::Matrix{Mat{M,N,T,S}}) where {M,N,T,S}
+    # rtol = sqrt(eps(real(float(one(T)))))
     Lfull = Matrix(L)
-    Linv = pinv(Lfull)
-    
-    # if T==Float64
-    #     Ldouble = Double64.(L)
-    #     # Ldouble = BigFloat.(L)
-    # elseif T==ComplexF64
-    #     Ldouble = ComplexDF64.(L)
-    #     # Ldouble = Complex{BigFloat}.(L)
-    # end
-    # Linv = @suppress pinv(Ldouble)
-    # return Linv
-    return pinv(L;rtol=rtol)
+    Linv = invert_green_matrix(Lfull)
+    return matrix_to_tensor(Mat{M,N,eltype(Linv),S},Linv)
+end
+
+function invert_green_matrix(L::AbstractMatrix{T}) where {T<:Number}
+    if T==Float64
+        Ldouble = Double64.(L)
+        # Ldouble = BigFloat.(L)
+    elseif T==ComplexF64
+        Ldouble = ComplexDF64.(L)
+        # Ldouble = Complex{BigFloat}.(L)
+    end
+    Linv = @suppress pinv(Ldouble)
+    return Linv
+    # rtol = sqrt(eps(real(float(one(T)))))
+    # return pinv(L;rtol=rtol)
 end
 
 function GreensCorrection(iop::IntegralOperator,xs)
     # construct greens "basis" from source locations xs
     op     = iop.kernel.op
     basis     = [y->SingleLayerKernel(op)(x,y) for x in xs]
-    γ₁_basis  = [(y,ny)->DoubleLayerKernel(op)(x,y,ny) for x in xs]
+    γ₁_basis  = [(y,ny)->transpose(DoubleLayerKernel(op)(x,y,ny)) for x in xs]
     GreensCorrection(iop,basis,γ₁_basis)
 end
 
 function GreensCorrection(iop::IntegralOperator)
     nquad  = mapreduce(x->length(x),max,getelements(iop.Y))
-    nbasis = 2*nquad + 2
+    nbasis = 2*nquad + 1
     # construct source basis
     xs     = source_gen(iop.Y,nbasis)
     GreensCorrection(iop,xs)
@@ -137,7 +139,6 @@ error_derivative_green_formula(ADL,H,γ₀u,γ₁u,σ)           = σ*γ₁u + A
 error_interior_green_identity(SL,DL,γ₀u,γ₁u)              = error_green_formula(SL,DL,γ₀u,γ₁u,-1/2)
 error_interior_derivative_green_identity(ADL,H,γ₀u,γ₁u)   = error_derivative_green_formula(ADL,H,γ₀u,γ₁u,-1/2)
 error_exterior_green_identity(SL,DL,γ₀u,γ₁u)              = error_green_formula(SL,DL,γ₀u,γ₁u,1/2)
-
 error_exterior_derivative_greens_identity(ADL,H,γ₀u,γ₁u)  = error_derivative_green_formula(ADL,H,γ₀u,γ₁u,-1/2)
 
 """
@@ -167,54 +168,3 @@ function near_interaction_list(X,Y; tol=-1, hfactor=tol≥0 ? 0 : 5)
     end
     return list
 end
-
-# function OldGreensCorrection(iop,)
-#     idx_el2n    = getelements(Y)
-#     nel         = length(idx_el2n)
-#     qsize = length(IOp.Y |> quadrature_type)
-#     @show nel, ndof, qsize
-#     SL_kernel   = SingleLayerKernel(op)
-#     DL_kernel   = DoubleLayerKernel(op)
-#     γ₀B         = [transpose(SL_kernel(x,y)) for y in quad.nodes,  x in xₛ]
-#     γ₁B         = [transpose(DL_kernel(x,y,ny)) for (y,ny) in zip(quad.nodes,quad.normals), x in xₛ ]
-
-#     if kernel_type(IOp) isa Union{SingleLayer,DoubleLayer}
-#         a,b = 1,0
-#         R  = Op2*γ₀B - Op1*γ₁B + σ*γ₀B
-#     elseif kernel_type(IOp) isa Union{AdjointDoubleLayer,HyperSingular}
-#         a,b = 0,-1
-#         R  = Op2*γ₀B - Op1*γ₁B + σ*γ₁B
-#     end
-#     L      = Vector{Matrix{T}}(undef,nel)
-#     for iel in 1:nel
-#         idx       = elements[iel]
-#         k         = length(idx)
-#         D         = [diagm(fill(a,k));diagm(fill(b,k))]
-#         A         = Matrix(γ₀B[idx,:])
-#         B         = Matrix(γ₁B[idx,:])
-#         L[iel]    = pinv([A;B])*D
-#     end
-#     return GreensCorrection(γ₀B,γ₁B,L,R,deepcopy(elements))
-# end
-
-# function (corr::GreensCorrection)(x::AbstractVector)
-#     TS = promote_type(eltype(corr),eltype(x))
-#     idxs = corr.idxs
-#     R    = corr.R
-#     out = zero(TS,x)
-#     for iel in 1:length(idxs)
-#         tmp = L[iel]*x[idxs[iel]]
-#         for i in iel
-#             out[i] += R[i:i,:]*tmp
-#         end
-#     end
-#     return out
-# end
-
-# function Base.getindex(corr::GreensCorrection{N,T},i::Int,j::Int) where {N,T}
-#     if abs(i-j) >= corr.quad.nodes_per_element
-#         return zero(T)
-#     else
-#         δj = [i==j for i=1:leg]
-#     end
-# end

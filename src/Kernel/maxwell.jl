@@ -6,7 +6,7 @@ end
 function (SL::SingleLayerKernel{N,T,Op})(x,y)::T  where {N,T,Op<:Maxwell}
     x==y && return zero(T)
     k = SL.op.k
-    r = x-y
+    r = x .- y
     d = norm(r)
     if N==2
         return error("Maxwell operator not implemented in 2d")
@@ -25,7 +25,7 @@ SingleLayerKernel{N}(op::Op,args...) where {N,Op<:Maxwell} = SingleLayerKernel{N
 function (DL::DoubleLayerKernel{N,T,Op})(x,y,ny)::T where {N,T,Op<:Maxwell}
     x==y && return zero(T)
     k = DL.op.k
-    r = x-y
+    r = x .- y
     d = norm(r)
     g   = 1/(4π)/d * exp(im*k*d)
     gp  = im*k*g - g/d
