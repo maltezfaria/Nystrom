@@ -5,6 +5,8 @@ using LinearAlgebra
 using SpecialFunctions
 using RecipesBase
 using GmshTools
+using DoubleFloats
+using Suppressor
 
 import ForwardDiff # used for computing jacobian
 
@@ -91,14 +93,14 @@ include("Potentials/potentials.jl")
 ################################################################################
 include("Operators/integraloperators.jl")
 include("Operators/corrections.jl")
-
+include("Operators/assemble.jl")
 ################################################################################
 ## UTILS
 ################################################################################
 include("Utils/testutils.jl")
 include("Utils/geometryutils.jl")
 # include("Utils/math.jl")
-# include("Utils/conversions.jl")
+include("Utils/conversions.jl")
 # include("Utils/utils.jl")
 
 

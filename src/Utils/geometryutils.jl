@@ -1,5 +1,6 @@
-function source_gen(quad::Quadrature{<:Any,N},nsources;kfactor=5) where {N}
-    bbox   = bounding_box(getnodes(quad))
+function source_gen(Y,nsources;kfactor=5)
+    N      = ambient_dim(Y)
+    bbox   = bounding_box(getnodes(Y))
     d      = diameter(bbox)
     c      = center(bbox)
     if N===2
@@ -29,8 +30,8 @@ function circle_random_sources(;nsources, radius=5, center=[0 0])
     theta = 2π.*rand(nsources)
     Xs = Point{2,Float64}[]
     for th in theta
-        x = r*cos(th) + center[1]
-        y = r*sin(th) + center[2]
+        x = radius*cos(th) + center[1]
+        y = radius*sin(th) + center[2]
         pt = Point(x,y)
         push!(Xs, pt)
     end

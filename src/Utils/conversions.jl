@@ -1,7 +1,4 @@
-# convert an Array of SMatrices to a standard array to use the linear algebra solvers
-# TODO: This is inefficient since I copy the array. So either change the  original data structure, or
-# find a better fix
-
+# convert an Array of SMatrices to a standard array to use the linear algebra algorithms such as pinv
 function Base.Matrix(A::Array{Mat{M,N,T,L},2})  where {M,N,T,L}
     sblock = (M,N)
     ss = size(A).*sblock
@@ -12,6 +9,13 @@ function Base.Matrix(A::Array{Mat{M,N,T,L},2})  where {M,N,T,L}
         Afull[i,j] = A[bi,bj][ind_i,ind_j]
     end
     return Afull
+end
+
+function matrix_to_tensor(T,A::Matrix)
+    sblock = size(T)
+    ss     = div.(size(A),sblock)
+    Ablock = Matrix{T}(undef,ss)
+    
 end
 
 # function fill_matrix(IOp::IntegralOperator{N,T})  where {N,T}

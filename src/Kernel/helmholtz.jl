@@ -7,6 +7,8 @@ struct Helmholtz{N,T} <: AbstractPDE{N}
 end
 Helmholtz(;k,dim=3) = Helmholtz{dim,typeof(k)}(k)
 
+getname(::Helmholtz) = "Helmholtz"
+
 default_kernel_type(::Helmholtz) = ComplexF64
 default_density_type(::Helmholtz{N}) where {N} = ComplexF64
 
@@ -15,7 +17,7 @@ function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:Helmholtz}
     N = ambient_dim(S)
     x==y && return zero(T)
     k = SL.op.k
-    r = x-y
+    r = x .- y
     d = sqrt(sum(r.^2))
     # d = norm(x-y)
     if N==2
@@ -30,7 +32,7 @@ function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:Helmholtz}
     N = ambient_dim(S)
     x==y && return 0
     k = DL.op.k
-    r = x-y
+    r = x .- y
     d = sqrt(sum(r.^2))
     # d = norm(x-y)
     if N==2
@@ -45,7 +47,7 @@ function (ADL::AdjointDoubleLayerKernel{T,S})(x,y,nx)::T where {T,S<:Helmholtz}
     N = ambient_dim(S)
     x==y && return 0
     k = ADL.op.k
-    r = x-y
+    r = x .- y
     d = norm(r)
     if N==2
         return -im*k/4/d * hankelh1(1,k*d) .* dot(r,nx)
@@ -59,7 +61,7 @@ function (HS::HyperSingularKernel{T,S})(x,y,nx,ny)::T where {T,S<:Helmholtz}
     N = ambient_dim(S)
     x==y && return 0
     k = HS.op.k
-    r = x-y
+    r = x .- y
     d = norm(x-y)
     if N==2
         ID = Mat{2,2,Float64,4}(1,0,0,1)

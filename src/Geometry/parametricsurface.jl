@@ -179,7 +179,6 @@ end
             x = [pt[1] for pt in pts]
             y = [pt[2] for pt in pts]
             z = [pt[3] for pt in pts]
-            @info x,y,z, el
             x,y,z
         end
     end

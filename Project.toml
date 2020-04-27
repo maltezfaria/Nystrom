@@ -4,6 +4,7 @@ authors = ["Luiz M. Faria  <maltezfaria@gmail.com>, Carlos Perez-Arancibia  <cap
 version = "0.1.0"
 
 [deps]
+DoubleFloats = "497a8b3b-efae-58df-a0af-a86822472b78"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 GeometryTypes = "4d00f742-c7ba-57c2-abde-4428a4b178cb"
@@ -12,6 +13,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+Suppressor = "fd094767-a336-5f1f-9728-57cf17d0bbfb"
 
 [compat]
 julia = "^1"

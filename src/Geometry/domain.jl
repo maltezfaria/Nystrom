@@ -6,6 +6,8 @@ Domain{N,T}() where {N,T} = Domain{N,T}([],Quadrature{Any,N,T}())
 Domain{N}(args...) where {N} = Domain{N,Float64}(args...)
 Domain(;dim) = Domain{dim}()
 
+ambient_dim(Γ::Domain{N}) where {N} = N
+
 Base.push!(Γ::Domain,bdy::ParametricBody) = push!(Γ.bodies,bdy)
 
 function quadgen!(Γ::Domain{N,T},p,algo1d) where {N,T}
@@ -22,26 +24,27 @@ function quadgen!(Γ::Domain{N,T},p,algo1d) where {N,T}
     return Γ
 end
 
-function meshgen!(Γ::Domain,args...)
+function meshgen!(Γ::Domain,h)
     for bdy in getbodies(Γ)
-        meshgen!(bdy,args...)
+        meshgen!(bdy,h)
     end
     return Γ
 end
 
 function refine!(Γ::Domain)
     for bdy in getbodies(Γ)
-        @info bdy
         refine!(bdy)
     end
     return Γ
 end
 
-getnodes(Γ::Domain) = getnodes(Γ.quadrature)
-getweights(Γ::Domain) = getweights(Γ.quadrature)
-getnormals(Γ::Domain) = getnormals(Γ.quadrature)
+getnodes(Γ::Domain)    = getnodes(Γ.quadrature)
+getweights(Γ::Domain)  = getweights(Γ.quadrature)
+getnormals(Γ::Domain)  = getnormals(Γ.quadrature)
 getelements(Γ::Domain) = getelements(Γ.quadrature)
-getbodies(Γ::Domain)   = getlements(Γ.quadrature)
+getbodies(Γ::Domain)   = Γ.bodies
+
+Base.length(Γ::Domain) = length(Γ.quadrature)
 
 ################################################################################
 ## PLOT RECIPES

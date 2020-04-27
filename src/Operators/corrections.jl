@@ -71,12 +71,11 @@ function GreensCorrection(iop::IntegralOperator{T,K}, basis, γ₁_basis) where 
     elseif kernel_type(iop) isa Union{AdjointDoubleLayer,HyperSingular}
         ADL = IntegralOperator{T}(AdjointDoubleLayerKernel(op),X,Y) |> Matrix
         H   = IntegralOperator{T}(HyperSingularKernel(op),X,Y) |> Matrix
-        R  = error_interior_derivative_green_identity(ADL,H,γ₀B,γ₁B)
+        R   = error_interior_derivative_green_identity(ADL,H,γ₀B,γ₁B)
     end
 
     # compute the interpolation matrix
     a,b       = combined_field_coefficients(kernel)
-    @info a,b
     near_list = near_interaction_list(X,Y,tol=0)
     # _prune_interaction_list!(near_list,X,Y)
 
@@ -85,16 +84,36 @@ function GreensCorrection(iop::IntegralOperator{T,K}, basis, γ₁_basis) where 
             yels = getelements(Y)[idx_el]
             nnear = length(yels)
             L                = Matrix{T}(undef,2*nnear,nbasis)
-            D                = [diagm(fill(a,nnear));diagm(fill(b,nnear))]
+            D                = [diagm(fill(a*one(T),nnear));diagm(fill(b*one(T),nnear))]
             L[1:nnear,:]     = γ₀B[yels,:]
             L[nnear+1:end,:] = γ₁B[yels,:]
-            w[i] = (R[idx_node:idx_node,:]*pinv(L))*D |> vec
+            invL = invert_green_matrix(L)
+            w[i] = (R[idx_node:idx_node,:]*invL)*D |> vec
             idx_near[i] = copy(yels)
-            #NOTE: making a copy is important here or you get issues when mutating the GreesCorrection since mutating the non-zero
-            #indices of one row would inadvertently affect another.
+            #NOTE: making a copy is important here or you get issues when
+            #mutating the GreesCorrection since mutating the non-zero indices of
+            #one row would inadvertently affect another.
         end
     end
     return GreensCorrection{T}(kernel,X,Y,w,idx_near)
+end
+
+function invert_green_matrix(L)
+    T = eltype(L) |> eltype
+    rtol = sqrt(eps(real(float(one(T)))))
+    Lfull = Matrix(L)
+    Linv = pinv(Lfull)
+    
+    # if T==Float64
+    #     Ldouble = Double64.(L)
+    #     # Ldouble = BigFloat.(L)
+    # elseif T==ComplexF64
+    #     Ldouble = ComplexDF64.(L)
+    #     # Ldouble = Complex{BigFloat}.(L)
+    # end
+    # Linv = @suppress pinv(Ldouble)
+    # return Linv
+    return pinv(L;rtol=rtol)
 end
 
 function GreensCorrection(iop::IntegralOperator,xs)
@@ -107,19 +126,47 @@ end
 
 function GreensCorrection(iop::IntegralOperator)
     nquad  = mapreduce(x->length(x),max,getelements(iop.Y))
-    nbasis = 2*nquad + 3
+    nbasis = 2*nquad + 2
     # construct source basis
     xs     = source_gen(iop.Y,nbasis)
-    @info xs
     GreensCorrection(iop,xs)
 end
 
-error_green_formula(SL,DL,γ₀u,γ₁u,σ)                      = σ*γ₀u/2 + SL*γ₁u - DL*γ₀u
-error_derivative_green_formula(SL,DL,γ₀u,γ₁u,σ)           = σ*γ₁u/2 + SL*γ₁u - DL*γ₀u
+error_green_formula(SL,DL,γ₀u,γ₁u,σ)                      = σ*γ₀u + SL*γ₁u  - DL*γ₀u
+error_derivative_green_formula(ADL,H,γ₀u,γ₁u,σ)           = σ*γ₁u + ADL*γ₁u - H*γ₀u
 error_interior_green_identity(SL,DL,γ₀u,γ₁u)              = error_green_formula(SL,DL,γ₀u,γ₁u,-1/2)
 error_interior_derivative_green_identity(ADL,H,γ₀u,γ₁u)   = error_derivative_green_formula(ADL,H,γ₀u,γ₁u,-1/2)
-error_exterior_greens_identity(SL,DL,γ₀u,γ₁u)             = error_green_formula(SL,DL,γ₀u,γ₁u,1/2)
+error_exterior_green_identity(SL,DL,γ₀u,γ₁u)              = error_green_formula(SL,DL,γ₀u,γ₁u,1/2)
+
 error_exterior_derivative_greens_identity(ADL,H,γ₀u,γ₁u)  = error_derivative_green_formula(ADL,H,γ₀u,γ₁u,-1/2)
+
+"""
+    near_interaction_list(X::Quadrature,Y::Quadrature;[tol],)
+
+Return a vector of `length(X)` elements, where each element contains the index
+in `Y` of nodes for which `norm(x-y)<tol`. For points which belong to the same
+element in `Y`, only the closest one is returned.
+"""
+function near_interaction_list(X,Y; tol=-1, hfactor=tol≥0 ? 0 : 5)
+    n = length(X)
+    list = [Vector{Tuple{Int,Int}}() for _ = 1:n] # (idxel, idxnode) of near points for each x ∈ X
+    xnodes = getnodes(X)
+    ynodes = getnodes(Y)
+    yels   = getelements(Y)
+    for i in 1:n
+        x = xnodes[i]
+        for nel in 1:length(yels)
+            idxnodes = yels[nel]
+            hloc = local_mesh_size(Y,nel)
+            d = map(j -> norm(x .- ynodes[j]),idxnodes)
+            dmin,idx_min = findmin(d)
+            if dmin ≤ max(hfactor*hloc,tol)
+                push!(list[i],(nel,idxnodes[idx_min]))
+            end
+        end
+    end
+    return list
+end
 
 # function OldGreensCorrection(iop,)
 #     idx_el2n    = getelements(Y)

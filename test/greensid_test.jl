@@ -3,10 +3,11 @@ using SafeTestsets
 @safetestset "Greens formula" begin
     using Nystrom, LinearAlgebra, GeometryTypes, FastGaussQuadrature
     using Nystrom: error_greens_identity
-    geo = circle()
+    xc  = Point(0,0.)
+    geo = circle(center=xc)
     op  = Helmholtz(dim=2,k=1)
     # op  = Elastostatic(dim=2,μ=1,λ=1)
-    xin, xout = Point(0.2,-0.1), Point(5.2,-3.)
+    xin, xout = xc .+ Point(0.2,-0.1), xc .+ Point(5.2,-3.)
     @testset "No correction" begin
         # create a geometry
         for n=1:4
@@ -18,17 +19,14 @@ using SafeTestsets
     @testset "Greens correction" begin
         geo = circle()
         for _=1:5; refine!(geo); end
-        op = Laplace(dim=2)
+        op = Helmholtz(dim=2,k=1)
         p  = 4
         quad = tensorquadrature((p,),geo,gausslegendre)
-        Nystrom.near_interaction_list(quad,quad,tol=0.01)
-        Nystrom._prune_interaction_list!(list,X,Y)
+        # Nystrom.near_interaction_list(quad,quad,tol=0.01)
+        # Nystrom._prune_interaction_list!(list,X,Y)
         S    = SingleLayerOperator(op,quad)
         dS   = GreensCorrection(S)
         D    = DoubleLayerOperator(op,quad)
-        xs   = Nystrom.circle_sources(nsources=10,radius=5)
-        basis     = [y->SingleLayerKernel(op)(x,y) for x in xs]
-        γ₁_basis  = [(y,ny)->DoubleLayerKernel(op)(x,y,ny) for x in xs]
 
         # x    = SurfaceDensity(ComplexF64,quad)
         # dS(x)

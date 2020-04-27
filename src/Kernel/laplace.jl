@@ -4,13 +4,15 @@
 struct Laplace{N} <: AbstractPDE{N} end
 Laplace(;dim=3) = Laplace{dim}()
 
+getname(::Laplace) = "Laplace"
+
 default_kernel_type(::Laplace) = Float64
 default_density_type(::Laplace{N}) where {N} = Float64
 
 # Single Layer
 function (SL::SingleLayerKernel{T,Laplace{N}})(x,y)::T  where {N,T}
     x==y && return zero(T)
-    r = x-y
+    r = x .- y
     d = sqrt(sum(r.^2))
     if N==2
         return -1/(2π)*log(d)
@@ -22,7 +24,7 @@ end
 # Double Layer Kernel
 function (DL::DoubleLayerKernel{T,Laplace{N}})(x,y,ny)::T where {N,T}
     x==y && return zero(T)
-    r = x-y
+    r = x .- y
     d = sqrt(sum(r.^2))
     if N==2
         return 1/(2π)/(d^2) .* dot(r,ny)

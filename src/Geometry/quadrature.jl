@@ -54,34 +54,6 @@ function Base.empty!(q::Quadrature)
     return q
 end
 
-"""
-    near_interaction_list(X::Quadrature,Y::Quadrature;[tol],)
-
-Return a vector of `length(X)` elements, where each element contains the index
-in `Y` of nodes for which `norm(x-y)<tol`. For points which belong to the same
-element in `Y`, only the closest one is returned.
-"""
-function near_interaction_list(X::Quadrature,Y::Quadrature; tol=-1, hfactor=tol≥0 ? 0 : 5)
-    n = length(X)
-    list = [Vector{Tuple{Int,Int}}() for _ = 1:n] # (idxel, idxnode) of near points for each x ∈ X
-    xnodes = getnodes(X)
-    ynodes = getnodes(Y)
-    yels   = getelements(Y)
-    for i in 1:n
-        x = xnodes[i]
-        for nel in 1:length(yels)
-            idxnodes = yels[nel]
-            hloc = local_mesh_size(Y,nel)
-            d = map(j -> norm(x .- ynodes[j]),idxnodes)
-            dmin,idx_min = findmin(d)
-            if dmin ≤ max(hfactor*hloc,tol)
-                push!(list[i],(nel,idxnodes[idx_min]))
-            end
-        end
-    end
-    return list
-end
-
 function _prune_interaction_list!(list,X,Y)
     for i in 1:length(X)
         x = getnodes(X)[i]
