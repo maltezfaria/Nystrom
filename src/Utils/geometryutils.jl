@@ -1,8 +1,13 @@
-function source_gen(quad::Quadrature{N,T},nsources,r0) where {N,T}
-    if N==2
-        xs = circle_sources(nsources,r0)
-    elseif N==3
-        xs = sphere_sources_uniform(nsources, r0)
+function source_gen(quad::Quadrature{<:Any,N},nsources;kfactor=5) where {N}
+    bbox   = bounding_box(getnodes(quad))
+    d      = diameter(bbox)
+    c      = center(bbox)
+    if N===2
+        xs     = circle_sources(nsources=nsources,center=c,radius=kfactor*d/2)
+    elseif N===3
+        xs     = sphere_sources_lebedev(nsources=nsources,center=c,radius=kfactor*d/2)
+    else
+        error("dimension must be 2 or 3. Got $N")
     end
     return xs
 end
@@ -20,7 +25,7 @@ function circle_sources(;nsources, radius=5, center=[0 0])
     return Xs
 end
 
-function circle_random_sources(nsources, r=5, center=[0 0])
+function circle_random_sources(;nsources, radius=5, center=[0 0])
     theta = 2π.*rand(nsources)
     Xs = Point{2,Float64}[]
     for th in theta
@@ -32,7 +37,7 @@ function circle_random_sources(nsources, r=5, center=[0 0])
     return Xs
 end
 
-function sphere_sources(nsources, r=5, center=[0 0 0])
+function sphere_sources(;nsources, radius=5, center=[0 0 0])
     Xs = Point{3,Float64}[]
     for n in 1:nsources
             θ,φ = rand()*2π, rand()*π
@@ -45,7 +50,7 @@ function sphere_sources(nsources, r=5, center=[0 0 0])
     return Xs
 end
 
-function sphere_sources_uniform(nsources, r=10, center=[0 0 0])
+function sphere_sources_uniform(;nsources, radius=10, center=[0 0 0])
     Xs = Point{3,Float64}[]
     n  = ceil(sqrt(nsources)) # number of sources per direction (same for θ and φ)
     for i=1:n
@@ -62,7 +67,7 @@ function sphere_sources_uniform(nsources, r=10, center=[0 0 0])
     return Xs
 end
 
-function sphere_sources_lebedev(nsources, r=10, center=Point(0.,0.,0.))
+function sphere_sources_lebedev(;nsources, radius=10, center=Point(0.,0.,0.))
     lpts = lebedev_points(nsources)
     Xs = Point{3,Float64}[]
     for pt in lpts

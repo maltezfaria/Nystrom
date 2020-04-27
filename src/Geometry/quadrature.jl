@@ -16,8 +16,9 @@ struct Quadrature{Q,N,T}
     weights::Vector{T}
     normals::Vector{Normal{N,T}}
     elements::Vector{Vector{Int}}
+    bodies::Vector{Vector{Int}}
 end
-Quadrature{Q,N,T}() where {Q,N,T}= Quadrature{Q,N,T}([],[],[],[])
+Quadrature{Q,N,T}() where {Q,N,T}= Quadrature{Q,N,T}([],[],[],[],[])
 
 ambient_dim(q::Quadrature{Q,N}) where {Q,N}   = N
 geometric_dim(q::Quadrature{Q,N}) where {Q,N} = geometric_dim(Q)
@@ -27,8 +28,31 @@ getweights(q::Quadrature)  = q.weights
 getnodes(q::Quadrature)    = q.nodes
 getnormals(q::Quadrature)  = q.normals
 getelements(q::Quadrature) = q.elements
+getbodies(q::Quadrature) = q.elements
 
 Base.length(q::Quadrature) = length(getnodes(q))
+
+function Base.append!(q::Quadrature,qa::Quadrature)
+    el_new  = map(x-> x .+ length(q.nodes),qa.elements)
+    bdy_new = map(x-> x .+ length(q.elements),qa.bodies)
+    #NOTE: since the elements and bodies are indexed based on the local node
+    # indexing, must shift the indexes, which is done using map below.
+    append!(q.nodes,qa.nodes)
+    append!(q.weights,qa.weights)
+    append!(q.normals,qa.normals)
+    append!(q.elements,el_new)
+    append!(q.bodies,bdy_new)
+    return q
+end
+
+function Base.empty!(q::Quadrature)
+    empty!(q.nodes)
+    empty!(q.weights)
+    empty!(q.normals)
+    empty!(q.elements)
+    empty!(q.bodies)
+    return q
+end
 
 """
     near_interaction_list(X::Quadrature,Y::Quadrature;[tol],)
@@ -37,17 +61,21 @@ Return a vector of `length(X)` elements, where each element contains the index
 in `Y` of nodes for which `norm(x-y)<tol`. For points which belong to the same
 element in `Y`, only the closest one is returned.
 """
-function near_interaction_list(X::Quadrature,Y::Quadrature; tol=0, hfactor=tol>0 ? 0 : 5)
+function near_interaction_list(X::Quadrature,Y::Quadrature; tol=-1, hfactor=tol≥0 ? 0 : 5)
     n = length(X)
-    list = [Vector{Tuple{Int,Int}}() for _ = 1:n]
+    list = [Vector{Tuple{Int,Int}}() for _ = 1:n] # (idxel, idxnode) of near points for each x ∈ X
+    xnodes = getnodes(X)
+    ynodes = getnodes(Y)
+    yels   = getelements(Y)
     for i in 1:n
-        x = getnodes(X)[i]
-        for (n,yel) in enumerate(getelements(Y))
-            d = map(y -> norm(x-y),getnodes(Y)[yel])
+        x = xnodes[i]
+        for nel in 1:length(yels)
+            idxnodes = yels[nel]
+            hloc = local_mesh_size(Y,nel)
+            d = map(j -> norm(x .- ynodes[j]),idxnodes)
             dmin,idx_min = findmin(d)
-            hloc = local_mesh_size(Y,n,yel[idx_min])
-            if dmin < max(hfactor*hloc,tol)
-                push!(list[i],(n,yel[idx_min]))
+            if dmin ≤ max(hfactor*hloc,tol)
+                push!(list[i],(nel,idxnodes[idx_min]))
             end
         end
     end
@@ -61,8 +89,8 @@ function _prune_interaction_list!(list,X,Y)
         dmin,nmin,jmin = Inf,-1,-1
         for (n,j) in list[i]
             y = getnodes(Y)[j]
-            d = norm(x - y) 
-            if d < dmin 
+            d = norm(x - y)
+            if d < dmin
                 dmin = d
                 nmin = n
                 jmin = j
@@ -73,20 +101,17 @@ function _prune_interaction_list!(list,X,Y)
     return list
 end
 
-
-function local_mesh_size(Y,iel,inode)
-    idxs  = getelements(Y)[iel]
+function local_mesh_size(Y,iel)
     nodes = getnodes(Y)
-    ymin  = nodes[inode]
-    hloc  = mapreduce(min,idxs) do j
-        if ymin == nodes[j]
-            h = Inf
-        else
-            h = norm(ymin-nodes[j])
+    idxs  = getelements(Y)[iel]
+    nidxs = length(idxs)
+    hmax  = 0
+    for i in 1:nidxs
+        for j in i+1:nidxs
+            hmax = max(hmax,norm(nodes[i] .- nodes[j]))
         end
-        return h
     end
-    return hloc
+    return hmax
 end
 
 """
@@ -115,7 +140,7 @@ struct TensorQuadrature{S} end
 #NOTE: figure out how to restrict the type parameter `S` above to reinforce it is `NTuple{N,Int} where {N}`
 
 Base.length(q::TensorQuadrature) = length(typeof(q))
-Base.size(q::TensorQuadrature)   = size(typeof(q)) 
+Base.size(q::TensorQuadrature)   = size(typeof(q))
 Base.length(::Type{TensorQuadrature{S}}) where {S} = prod(S)
 Base.size(::Type{TensorQuadrature{S}}) where {S} = S
 
@@ -139,14 +164,14 @@ end
 
 tensorquadrature(p::NTuple,args...;kwargs...) = tensorquadrature(TensorQuadrature{p}(),args...;kwargs...)
 
-function tensorquadrature(q::TensorQuadrature,el::HyperRectangle,algo)
+function tensorquadrature(q::TensorQuadrature,el::Cuboid,algo)
     Q = typeof(q)
-    N = ndims(el)
+    N = dimension(el)
     p = size(Q)
     nodes1d   = Vector{Vector{Float64}}(undef,N)
     weights1d = Vector{Vector{Float64}}(undef,N)
     for n in 1:N
-        nodes1d[n], weights1d[n] = _rescale_quadrature(p[n],el.origin[n],el.widths[n],algo)
+        nodes1d[n], weights1d[n] = _rescale_quadrature(p[n],el.low_corner[n],el.high_corner[n]-el.low_corner[n],algo)
     end
     nodes = Vector{Point{N,Float64}}(undef,prod(p))
     for (n,node) in enumerate(Iterators.product(nodes1d...))
@@ -156,7 +181,94 @@ function tensorquadrature(q::TensorQuadrature,el::HyperRectangle,algo)
     for (n,weight) in enumerate(Iterators.product(weights1d...))
         weights[n] = prod(weight)
     end
-    return Quadrature{Q,N,Float64}(nodes,weights,[],[])
+    return Quadrature{Q,N,Float64}(nodes,weights,[],[],[])
+end
+
+function tensorquadrature(q::TensorQuadrature,surf::ParametricSurface{M,N,T},algo) where {M,N,T}
+    Q = typeof(q)
+    quad = Quadrature{Q,N,T}()
+    for element in  getelements(surf)
+        # compute quadrature on reference element
+        push!(quad.elements,[])
+        ref_quad = tensorquadrature(q,element,algo) # quadrature in reference element
+        for (node,weight) in zip(getnodes(ref_quad),getweights(ref_quad))
+            push!(quad.nodes,surf(node))
+            push!(quad.elements[end],length(quad.nodes))
+            jac      = jacobian(surf,node)
+            if N==2
+                jac_det    = norm(jac)
+                normal = [jac[2],-jac[1]]./jac_det
+            elseif N==3
+                tmp = cross(jac[:,1],jac[:,2])
+                jac_det = norm(tmp)
+                normal = tmp./jac_det
+            end
+            push!(quad.normals,normal)
+            push!(quad.weights,jac_det*weight)
+        end
+    end
+    return quad
+end
+
+function tensorquadrature(q::TensorQuadrature,bdy::ParametricBody{M,N,T},algo) where {M,N,T}
+    Q = typeof(q)
+    quad = Quadrature{Q,N,T}()
+    for surf in bdy.patches
+        for element in  getelements(surf)
+            # compute quadrature on reference element
+            push!(quad.elements,[])
+            ref_quad = tensorquadrature(q,element,algo) # quadrature in reference element
+            for (node,weight) in zip(getnodes(ref_quad),getweights(ref_quad))
+                push!(quad.nodes,surf(node))
+                push!(quad.elements[end],length(quad.nodes))
+                jac      = jacobian(surf,node)
+                if N==2
+                    jac_det    = norm(jac)
+                    normal = [jac[2],-jac[1]]./jac_det
+                elseif N==3
+                    tmp = cross(jac[:,1],jac[:,2])
+                    jac_det = norm(tmp)
+                    normal = tmp./jac_det
+                end
+                push!(quad.normals,normal)
+                push!(quad.weights,jac_det*weight)
+            end
+        end
+    end
+    push!(quad.bodies,1:length(quad.elements)|>collect)
+    return quad
+end
+
+function tensorquadrature(q::TensorQuadrature,geo::Vector{ParametricBody{M,N,T}},algo) where {M,N,T}
+    Q = typeof(q)
+    quad = Quadrature{Q,N,T}()
+    for bdy in geo
+        push!(quad.bodies,[])
+        for surf in bdy.patches
+            for element in  getelements(surf)
+                # compute quadrature on reference element
+                push!(quad.elements,[])
+                ref_quad = tensorquadrature(q,element,algo) # quadrature in reference element
+                for (node,weight) in zip(getnodes(ref_quad),getweights(ref_quad))
+                    push!(quad.nodes,surf(node))
+                    push!(quad.elements[end],length(quad.nodes))
+                    jac      = jacobian(surf,node)
+                    if N==2
+                        jac_det    = norm(jac)
+                        normal = [jac[2],-jac[1]]./jac_det
+                    elseif N==3
+                        tmp = cross(jac[:,1],jac[:,2])
+                        jac_det = norm(tmp)
+                        normal = tmp./jac_det
+                    end
+                    push!(quad.normals,normal)
+                    push!(quad.weights,jac_det*weight)
+                end
+                push!(quad.bodies[end],length(quad.elements))
+            end
+        end
+    end
+    return quad
 end
 
 """

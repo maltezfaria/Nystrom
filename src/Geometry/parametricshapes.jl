@@ -1,28 +1,28 @@
 ######################## 2D ##############################################
 function ellipsis(;paxis=ones(2),center=ones(2))
     f(s)       = center .+ paxis.*[cospi(s[1]),sinpi(s[1])]
-    domain     = HyperRectangle(-1.0,2.0)
-    surf       = ParametricSurface{2}(f,[domain])
+    domain     = Cuboid(-1.0,1.0)
+    surf       = ParametricSurface{2}(f,domain,[domain])
     return ParametricBody{2}([surf])
 end
-circle(;radius=1,center=ones(2)) = ellipsis(;paxis=radius*ones(2),center=center)
+circle(;radius=1,center=zeros(2)) = ellipsis(;paxis=radius*ones(2),center=center)
 
 function kite(;radius=1,center=ones(2))
     f(s) = center .+ rad.*[cospi(s[1]) + 0.65*cospi(2*s[1]) - 0.65,
                 1.5*sinpi(s[1])]
-    domain = HyperRectangle(-1.0,2.0)
-    surf   = ParametricSurface{2}(f,[domain])
+    domain = Cuboid(-1.0,1.0)
+    surf   = ParametricSurface{2}(f,domain,[domain])
     return ParametricBody{2}([surf])
 end
 
 ######################## 3D ##############################################
 function cube(;paxis=ones(3),center=zeros(3))
     nparts = 6
-    domain = HyperRectangle(-1.,-1.,2.,2.)
+    domain = Cuboid((-1.0,-1.0),(1.0,1.0))
     parts = ParametricSurface{2,3,Float64}[]
     for id=1:nparts
         param(x) = _cube_parametrization(x[1],x[2],id,paxis,center)
-        patch = ParametricSurface{3}(param,[domain])
+        patch = ParametricSurface{3}(param,domain,[domain])
         push!(parts,patch)
     end
     return ParametricBody{3}(parts)
@@ -30,11 +30,11 @@ end
 
 function ellipsoid(;paxis=ones(3),center=zeros(3))
     nparts = 6
-    domain = HyperRectangle(-1.,-1.,2.,2.)
+    domain = Cuboid((-1.0,-1.0),(1.0,1.0))
     parts = ParametricSurface{2,3,Float64}[]
     for id=1:nparts
         param(x) = _ellipsoid_parametrization(x[1],x[2],id,paxis,center)
-        patch = ParametricSurface{3}(param,[domain])
+        patch = ParametricSurface{3}(param,domain,[domain])
         push!(parts,patch)
     end
     return ParametricBody{3}(parts)
@@ -43,11 +43,11 @@ sphere(;radius=1,center=zeros(3)) = ellipsoid(;paxis=radius*ones(3),center=cente
 
 function bean(;paxis=ones(3),center=zeros(3))
     nparts = 6
-    domain = HyperRectangle(-1.,-1.,2.,2.)
+    domain = Cuboid((-1.0,-1.0),(1.0,1.0))
     parts  = ParametricSurface{2,3,Float64}[]
     for id=1:nparts
         param(x) = _bean_parametrization(x[1],x[2],id,paxis,center)
-        patch    = ParametricSurface{3}(param,[domain])
+        patch    = ParametricSurface{3}(param,domain,[domain])
         push!(parts,patch)
     end
     return ParametricBody{3}(parts)

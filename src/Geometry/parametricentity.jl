@@ -18,19 +18,19 @@ getelements(surf::AbstractEntity) = surf.elements
 
 struct ParametricCurve{N,T} <: AbstractEntity{1,N,T}
     parametrization
-    elements::Vector{HyperRectangle{1,T}}
+    elements::Vector{Cuboid{1,T}}
     boundary::Vector{Point{1,T}}
 end
 
 struct ParametricSurface{N,T} <: AbstractEntity{2,N,T}
     parametrization
-    elements::Vector{HyperRectangle{2,T}}
+    elements::Vector{Cuboid{2,T}}
     boundary::Vector{ParametricCurve{N,T}}
 end
 
 struct ParametricVolume{N,T} <: AbstractEntity{3,N,T}
     parametrization
-    elements::Vector{HyperRectangle{3,T}}
+    elements::Vector{Cuboid{3,T}}
     boundary::Vector{ParametricSurface{N,T}}
 end
 
@@ -52,20 +52,20 @@ end
 
 struct GmshParametricCurve <: AbstractEntity{1,3,Float64}
     tag::Int
-    elements::Vector{HyperRectangle{1,Float64}}
+    elements::Vector{Cuboid{1,Float64}}
     boundary::Vector{Point{3,Float64}}
 end
 
 struct GmshParametricSurface <: AbstractEntity{2,3,Float64}
     tag::Int
-    elements::Vector{HyperRectangle{2,Float64}}
+    elements::Vector{Cuboid{2,Float64}}
     boundary::Vector{GmshParametricCurve}
 end
 
 struct GmshParametricVolume <: AbstractEntity{2,3,Float64}
     # dim=M
     tag::Int
-    elements::Vector{HyperRectangle{3,Float64}}
+    elements::Vector{Cuboid{3,Float64}}
     boundary::Vector{GmshParametricSurface}
 end
 
@@ -153,7 +153,7 @@ end
 # 2D
 function ellipsis(;paxis=ones(2),center=ones(2))
     f(s)       = center .+ paxis.*[cospi(s[1]),sinpi(s[1])]
-    domain     = HyperRectangle(-1.0,2.0)
+    domain     = Cuboid(-1.0,1.0)
     surf       = ParametricSurface{2}(f,[domain])
     return ParametricBody{2}([surf])
 end
@@ -162,7 +162,7 @@ circle(;radius=1,center=ones(2)) = ellipsis(;paxis=radius*ones(2),center=center)
 function kite(;radius=1,center=ones(2))
     f(s) = center .+ rad.*[cospi(s[1]) + 0.65*cospi(2*s[1]) - 0.65,
                 1.5*sinpi(s[1])]
-    domain = HyperRectangle(-1.0,2.0)
+    domain = Cuboid(-1.0,1.0)
     surf   = ParametricSurface{2}(f,[domain])
     return ParametricBody{2}([surf])
 end
@@ -170,7 +170,7 @@ end
 # 3D
 function cube(;paxis=ones(3),center=zeros(3))
     nparts = 6
-    domain = HyperRectangle(-1.,-1.,2.,2.)
+    domain = Cuboid((-1.0,-1.0),(1.0,1.0))
     parts = ParametricSurface{2,3,Float64}[]
     for id=1:nparts
         param(x) = _cube_parametrization(x[1],x[2],id,paxis,center)
@@ -182,7 +182,7 @@ end
 
 function ellipsoid(;paxis=ones(3),center=zeros(3))
     nparts = 6
-    domain = HyperRectangle(-1.,-1.,2.,2.)
+    domain = Cuboid((-1.0,-1.0),(1.0,1.0))
     parts = ParametricSurface{2,3,Float64}[]
     for id=1:nparts
         param(x) = _ellipsoid_parametrization(x[1],x[2],id,paxis,center)
@@ -195,7 +195,7 @@ sphere(;radius=1,center=zeros(3)) = ellipsoid(;paxis=radius*ones(3),center=cente
 
 function bean(;paxis=ones(3),center=zeros(3))
     nparts = 6
-    domain = HyperRectangle(-1.,-1.,2.,2.)
+    domain = Cuboid((-1.0,-1.0),(1.0,1.0))
     parts  = ParametricSurface{2,3,Float64}[]
     for id=1:nparts
         param(x) = _bean_parametrization(x[1],x[2],id,paxis,center)

@@ -1,6 +1,6 @@
 module Nystrom
 
-using GeometryTypes: Point, Normal, HyperRectangle, Mat
+using GeometryTypes: Point, Normal, Mat
 using LinearAlgebra
 using SpecialFunctions
 using RecipesBase
@@ -9,7 +9,7 @@ using GmshTools
 import ForwardDiff # used for computing jacobian
 
 export
-    # shapes
+    # geometry
     ellipsis,
     circle,
     kite,
@@ -18,9 +18,12 @@ export
     ellipsoid,
     bean,
     refine!,
-    # quadrature
+    domain,
+    quadgen!,
+    meshgen!,
     tensorquadrature,
     gmshquadrature,
+    Domain,
     # operators
     Laplace,
     Helmholtz,
@@ -55,14 +58,17 @@ export
 ################################################################################
 ## GEOMETRY
 ################################################################################
+include("Geometry/cuboid.jl")
 include("Geometry/parametricsurface.jl")
 include("Geometry/parametricbody.jl")
 include("Geometry/parametricshapes.jl")
+include("Geometry/quadrature.jl")
+include("Geometry/domain.jl")
 
 ################################################################################
 ## QUADRATURE
 ################################################################################
-include("Quadrature/quadrature.jl")
+# include("Quadrature/quadrature.jl")
 
 ################################################################################
 ## KERNEL

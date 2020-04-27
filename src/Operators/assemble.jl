@@ -1,3 +1,8 @@
+function Base.Matrix(iop::IntegralOperator;correction=:greens)
+    
+end
+
+
 function assemble(I::IntegralOperator)
     I₀ = _assemble_far(I)
     δI = _assemble_near(I)

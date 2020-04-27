@@ -14,7 +14,8 @@ given, the default constructor sets `M=N-1` and `T=Float64`.
 """
 struct ParametricSurface{M,N,T}
     parametrization::Function
-    elements::Vector{HyperRectangle{M,T}}
+    domain::Cuboid{M,T}
+    elements::Vector{Cuboid{M,T}}
 end
 
 """
@@ -24,7 +25,7 @@ An `M` dimensional entity represented by `GMSH` through its dimension `M` and `t
 
 Behaves similar to `ParametricSurface`, but since we do not have direct access
 to the function representation of the underlying entity different methods have
-to be called to query the surface for information.
+pto be called to query the surface for information.
 
 Although this is useful for dealing with more complex CAD surfaces, such objects
 depend on the external library `gmsh` and therefore the validity cannot be verified
@@ -35,7 +36,7 @@ See also: [`ParametricSurface`](@ref)
 struct GmshParametricSurface{M}
     # dim=M
     tag::Int
-    elements::Vector{HyperRectangle{M,Float64}}
+    elements::Vector{Cuboid{M,Float64}}
 end
 
 ambient_dim(p::ParametricSurface{M,N}) where {M,N}   = N
@@ -47,7 +48,7 @@ ParametricSurface{N}(args...) where {N} = ParametricSurface{N-1,N,Float64}(args.
 
 function GmshParametricSurface(dim::Int,tag::Int,model=gmsh.model.getCurrent())
     (umin,vmin),(umax,vmax) = gmsh.model.getParametrizationBounds(dim,tag)
-    rec = HyperRectangle(umin,vmin,umax-umin,vmax-vmin)
+    rec = Cuboid(umin,vmin,umax-umin,vmax-vmin)
     return GmshParametricSurface{dim}(tag,model,[rec])
 end
 
@@ -85,7 +86,7 @@ end
 """
 function refine!(surf::ParametricSurface,ielem,axis)
     elem      = surf.elements[ielem]
-    mid_point = elem.origin[axis]+elem.widths[axis]/2
+    mid_point = (elem.low_corner[axis]+elem.high_corner[axis])/2
     elem1, elem2    = split(elem, axis, mid_point)
     surf.elements[ielem] = elem1
     push!(surf.elements,elem2)
@@ -105,12 +106,81 @@ function refine!(surf::ParametricSurface{M},ielem) where {M}
     return surf
 end
 
+"""
+    meshgen!(surf::ParametricSurface,h)
+"""
+function meshgen!(surf::ParametricSurface{M},h) where {M}
+    domain = surf.domain
+    n      = ceil.(Int,domain.high_corner-domain.low_corner / h)
+    elements = surf.elements
+    resize!(elements,prod(n))
+    if M == 1
+        x = range(domain.low_corner[1],domain.high_corner[1],length=n[1]+1)
+        for i in 1:n[1]
+            elements[i] = Cuboid(x[i],x[i+1])
+        end
+    elseif M == 2
+        x = range(domain.low_corner[1],domain.high_corner[1],length=n[1]+1)
+        y = range(domain.low_corner[2],domain.high_corner[2],length=n[2]+1)
+        cc = 1
+        for i in 1:n[1]
+            for j in 1:n[2]
+                elements[cc] = Cuboid((x[i],y[j]),(x[i+1],y[j+1]))
+                cc += 1
+            end
+        end
+    else
+        error("type parameter $M must be 1 or 2")
+    end
+    return surf
+end
+
 #refine all elements in all directions
-function refine!(surf)
+function refine!(surf::ParametricSurface)
     n = length(surf.elements)
     for i in 1:n
         refine!(surf,i)
     end
 end
 
+################################################################################
+## PLOTTING RECIPES
+################################################################################
+@recipe function f(surf::ParametricSurface{1,2}) # curves
+    legend --> false
+    grid   --> false
+    aspect_ratio --> :equal
+    elements = surf.elements
+    for n in 1:length(elements)
+        el = elements[n]
+        @series begin
+            linecolor --> n
+            pts = surf.(getpoints(el))
+            x = [pt[1] for pt in pts]
+            y = [pt[2] for pt in pts]
+            x,y
+        end
+    end
+end
 
+@recipe function f(surf::ParametricSurface{2,3}) # surfaces
+    legend --> false
+    grid   --> false
+    # aspect_ratio --> :equal
+    seriestype := :surface
+    # color  --> :blue
+    linecolor --> :black
+    elements = surf.elements
+    for n in 1:length(elements)
+        el = elements[n]
+        @series begin
+            fillcolor --> n
+            pts = surf.(getpoints(el))
+            x = [pt[1] for pt in pts]
+            y = [pt[2] for pt in pts]
+            z = [pt[3] for pt in pts]
+            @info x,y,z, el
+            x,y,z
+        end
+    end
+end

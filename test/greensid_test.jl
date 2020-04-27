@@ -21,12 +21,15 @@ using SafeTestsets
         op = Laplace(dim=2)
         p  = 4
         quad = tensorquadrature((p,),geo,gausslegendre)
+        Nystrom.near_interaction_list(quad,quad,tol=0.01)
+        Nystrom._prune_interaction_list!(list,X,Y)
         S    = SingleLayerOperator(op,quad)
+        dS   = GreensCorrection(S)
         D    = DoubleLayerOperator(op,quad)
         xs   = Nystrom.circle_sources(nsources=10,radius=5)
         basis     = [y->SingleLayerKernel(op)(x,y) for x in xs]
         γ₁_basis  = [(y,ny)->DoubleLayerKernel(op)(x,y,ny) for x in xs]
-        dS   = GreensCorrection(S,basis,γ₁_basis)
+
         # x    = SurfaceDensity(ComplexF64,quad)
         # dS(x)
     end

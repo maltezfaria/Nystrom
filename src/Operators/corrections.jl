@@ -76,8 +76,9 @@ function GreensCorrection(iop::IntegralOperator{T,K}, basis, γ₁_basis) where 
 
     # compute the interpolation matrix
     a,b       = combined_field_coefficients(kernel)
-    near_list = near_interaction_list(X,Y)
-    _prune_interaction_list!(near_list,X,Y)
+    @info a,b
+    near_list = near_interaction_list(X,Y,tol=0)
+    # _prune_interaction_list!(near_list,X,Y)
 
     for i in 1:m # loop over rows
         for (idx_el,idx_node) in near_list[i]
@@ -88,7 +89,7 @@ function GreensCorrection(iop::IntegralOperator{T,K}, basis, γ₁_basis) where 
             L[1:nnear,:]     = γ₀B[yels,:]
             L[nnear+1:end,:] = γ₁B[yels,:]
             w[i] = (R[idx_node:idx_node,:]*pinv(L))*D |> vec
-            idx_near[i] = copy(yels) 
+            idx_near[i] = copy(yels)
             #NOTE: making a copy is important here or you get issues when mutating the GreesCorrection since mutating the non-zero
             #indices of one row would inadvertently affect another.
         end
@@ -96,8 +97,25 @@ function GreensCorrection(iop::IntegralOperator{T,K}, basis, γ₁_basis) where 
     return GreensCorrection{T}(kernel,X,Y,w,idx_near)
 end
 
-error_green_formula(SL,DL,γ₀u,γ₁u,σ)                      = σ*γ₀u/2 + SL*γ₁u - DL*γ₀u 
-error_derivative_green_formula(SL,DL,γ₀u,γ₁u,σ)           = σ*γ₁u/2 + SL*γ₁u - DL*γ₀u 
+function GreensCorrection(iop::IntegralOperator,xs)
+    # construct greens "basis" from source locations xs
+    op     = iop.kernel.op
+    basis     = [y->SingleLayerKernel(op)(x,y) for x in xs]
+    γ₁_basis  = [(y,ny)->DoubleLayerKernel(op)(x,y,ny) for x in xs]
+    GreensCorrection(iop,basis,γ₁_basis)
+end
+
+function GreensCorrection(iop::IntegralOperator)
+    nquad  = mapreduce(x->length(x),max,getelements(iop.Y))
+    nbasis = 2*nquad + 3
+    # construct source basis
+    xs     = source_gen(iop.Y,nbasis)
+    @info xs
+    GreensCorrection(iop,xs)
+end
+
+error_green_formula(SL,DL,γ₀u,γ₁u,σ)                      = σ*γ₀u/2 + SL*γ₁u - DL*γ₀u
+error_derivative_green_formula(SL,DL,γ₀u,γ₁u,σ)           = σ*γ₁u/2 + SL*γ₁u - DL*γ₀u
 error_interior_green_identity(SL,DL,γ₀u,γ₁u)              = error_green_formula(SL,DL,γ₀u,γ₁u,-1/2)
 error_interior_derivative_green_identity(ADL,H,γ₀u,γ₁u)   = error_derivative_green_formula(ADL,H,γ₀u,γ₁u,-1/2)
 error_exterior_greens_identity(SL,DL,γ₀u,γ₁u)             = error_green_formula(SL,DL,γ₀u,γ₁u,1/2)

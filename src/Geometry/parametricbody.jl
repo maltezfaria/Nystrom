@@ -19,5 +19,13 @@ function refine!(geo::ParametricBody)
     return geo
 end
 
+function meshgen!(geo::ParametricBody,args...)
+    for patch in geo.patches
+        meshgen!(patch,args...)
+    end
+    return geo
+end
+
+
 
 
