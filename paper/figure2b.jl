@@ -1,76 +1,53 @@
-using Nystrom, Test, Logging, GeometryTypes, LinearAlgebra, Plots, GmshTools, LaTeXStrings
-using Nystrom: SingleLayerKernel, DoubleLayerKernel, Laplace, Stokes, quadgen, SingleLayerPotential, DoubleLayerPotential,
-    Helmholtz, Stokes, Maxwell, SingleLayerOperator, DoubleLayerOperator, IOpCorrection, AdjointDoubleLayerKernel,
-    HypersingularKernel, AdjointDoubleLayerOperator, HypersingularOperator
-
-function compute_error(op,Γ,qorder,niter,dim=3)
-    nn     = Float64[]
-    ee     = Float64[]
-    for iter in 1:niter
-        quad        = quadgen(Γ,qorder)
-        npts = length(quad.nodes)
-        npts > 10_000 && continue
-        global nodes_per_element = quad.nodes_per_element
-        push!(nn,npts^(1/(dim-1.)))
-        println("DOF: $(npts)")
-        println("nodes per element: $(quad.nodes_per_element)")
-        nsources    = 2*quad.nodes_per_element+1
-         # sources     = dim == 2 ? Nystrom.circle_sources(nsources) : Nystrom.sphere_sources_uniform(nsources)
-        sources     = dim == 2 ? Nystrom.circle_sources(nsources) : Nystrom.sphere_sources_lebedev(nsources,20)
-        println("number of basis for interpolation: $(length(sources))")
-        SL_kernel   = SingleLayerKernel{dim}(op)
-        DL_kernel   = DoubleLayerKernel{dim}(op)
-        SL_op       = SingleLayerOperator(SL_kernel,quad)
-        DL_op       = DoubleLayerOperator(DL_kernel,quad)
-        SL_matrix   = Matrix(SL_op)
-        DL_matrix   = Matrix(DL_op)
-        println("computing corrections...")
-        SLDL_corr        = IOpCorrection(SL_op,SL_matrix,DL_matrix,sources);
-        println("done.")
-        # exact solution as linear combination of rows of Greens tensor
-        xₛ          = 3*ones(Point{dim})
-        # trace of exact solution
-        T           = eltype(SL_kernel)
-        T <: Number ? c = one(T) : c = ones(size(T)[1])
-        γ₀U         = [transpose(SL_kernel(xₛ,y))*c   for  y in quad.nodes]
-        γ₁U         = [transpose(DL_kernel(xₛ,y,ny))*c for  (y,ny) in zip(quad.nodes,quad.normals)];
-        SL1(u)      = SL_op*u  - SLDL_corr(u,0,-1)
-        DL1(u)      = DL_op*u  - SLDL_corr(u,1,0)
-        # error in greens
-        er0 = γ₀U/2 - SL_op*γ₁U + DL_op*γ₀U
-        er1 = γ₀U/2 - SL1(γ₁U) + DL1(γ₀U)
-        push!(ee,norm(er1,Inf))
-        println("Greens identity error:")
-        println("$op $dim $(norm(er0,Inf))")
-        println("$op $dim $(norm(er1,Inf))")
-        Nystrom.refine!(Γ)
-    end
-    return nn,ee
-end
+using Nystrom, FastGaussQuadrature, Plots, LinearAlgebra, LaTeXStrings
+using Nystrom: error_interior_green_identity, error_exterior_green_identity
 
 function fig_gen()
     dim = 3
-    niter = 5
-    fig = plot()
-    for qorder = (2,3,4)
-        order::Float64 = qorder
-        OPERATORS = (Elastostatic(10,2),Elastodynamic(10,2,1,1),)
-        for  op in OPERATORS
-            Γ = Nystrom.bean()
-            nn, ee = compute_error(op,Γ,qorder,niter)
-            op isa Elastostatic ? (opname = "Elastostatic") : (opname = "Elastodynamic")
-            plot!(fig,nn,ee,marker=:x,label="M=$qorder  "*opname)
-            if op==last(OPERATORS)
-                plot!(fig,nn,nn.^(-order)/nn[end]^(-order)*ee[end],xscale=:log10,yscale=:log10,
-                      label="order $(Int(order)) slope",xlabel=L"$\sqrt{N_p}$",ylabel=L"|error|_\infty",linewidth=4)
+    Γ = Domain(dim=dim)
+    geo = sphere()
+    push!(Γ,geo)
+
+    fig       = plot(yscale=:log10,xscale=:log10,xlabel="#dof",ylabel="error")
+    qorder    = (2,3,4)
+    h0        = 0.5
+    niter     = 2
+    operators = (Elastostatic(dim=dim,μ=1,λ=1),Elastodynamic(dim=dim,λ=1,μ=1,ρ=1,ω=1))
+    op = operators[1]
+    p  = qorder[1]
+    for op in operators
+        # construct interior solution
+        c    = rand(dim)
+        xout = (3,3,3)
+        u    = (x)   -> SingleLayerKernel(op)(xout,x)*c
+        dudn = (x,n) -> transpose(DoubleLayerKernel(op)(xout,x,n))*c
+        for p in qorder
+            conv_order = p
+            meshgen!(Γ,h0)
+            ee_interior = []
+            dof         = []
+            for _ in 1:niter
+                quadgen!(Γ,(p,p),gausslegendre)
+                S  = SingleLayerOperator(op,Γ)
+                D  = DoubleLayerOperator(op,Γ)
+                δS = GreensCorrection(S)
+                δD = GreensCorrection(D)
+                # test interior Green identity
+                γ₀u       = γ₀(u,Γ)
+                γ₁u       = γ₁(dudn,Γ)
+                ee = error_interior_green_identity(S+δS,D+δD,γ₀u,γ₁u)
+                push!(ee_interior,norm(ee,Inf)/norm(γ₀u,Inf))
+                push!(dof,length(Γ))
+                refine!(Γ)
             end
-            Nystrom.refine!(Γ)
+            plot!(fig,dof,ee_interior,label=Nystrom.getname(op)*": p=$p",m=:o)
+            plot!(fig,dof,1 ./(dof.^conv_order)*dof[end]^(conv_order)*ee_interior[end],
+                  label="order $conv_order slope",linewidth=4)
         end
     end
     return fig
 end
 
 fig = fig_gen()
-fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/figures/fig2b.svg"
+fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1b.svg"
 savefig(fig,fname)
-fig
+display(fig)

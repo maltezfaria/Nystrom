@@ -9,25 +9,22 @@ function fig_gen()
 
     fig       = plot(yscale=:log10,xscale=:log10,xlabel="#dof",ylabel="error")
     qorder    = (2,3,4)
-    h0        = 0.1
+    h0        = 1.0
     niter     = 6
     operators = (Laplace(dim=2),Helmholtz(dim=2,k=2π))
     for op in operators
         # construct interior solution
-        xout = (4,3)
+        xout = (3,3)
         u    = (x)   -> SingleLayerKernel(op)(xout,x)
         dudn = (x,n) -> DoubleLayerKernel(op)(xout,x,n)
-        # construct exterior solution
-        xin  = (-.1,0.2)
-        v    = (x)   -> SingleLayerKernel(op)(xin,x)
-        dvdn = (x,n) -> DoubleLayerKernel(op)(xin,x,n)
         for p in qorder
+            conv_order = p + 1
             meshgen!(Γ,h0)
             ee_interior = []
             ee_exterior = []
             dof         = []
             for _ in 1:niter
-                quadgen!(Γ,(p,),gausslegendre)
+                quadgen!(Γ,p;algo1d=gausslegendre)
                 S  = SingleLayerOperator(op,Γ)
                 D  = DoubleLayerOperator(op,Γ)
                 δS = GreensCorrection(S)
@@ -37,22 +34,19 @@ function fig_gen()
                 γ₁u       = γ₁(dudn,Γ)
                 ee = error_interior_green_identity(S+δS,D+δD,γ₀u,γ₁u)
                 push!(ee_interior,norm(ee,Inf)/norm(γ₀u,Inf))
-                # test exterior Green identity
-                γ₀v       = γ₀(v,Γ)
-                γ₁v       = γ₁(dvdn,Γ)
-                ee = error_exterior_green_identity(S+δS,D+δD,γ₀v,γ₁v)
-                push!(ee_exterior,norm(ee,Inf)/norm(γ₀v,Inf))
+                @show length(Γ)
                 push!(dof,length(Γ))
                 refine!(Γ)
             end
-            # plot!(fig,dof,ee_interior,label=Nystrom.getname(op)*": p=$p",m=:x)
-            plot!(fig,dof,ee_exterior,label=Nystrom.getname(op)*": p=$p",m=:o)
+            plot!(fig,dof,ee_interior,label=Nystrom.getname(op)*": p=$p",m=:o)
+            plot!(fig,dof,1 ./(dof.^conv_order)*dof[end]^(conv_order)*ee_interior[end],
+                  label="",linewidth=4)
         end
     end
     return fig
 end
 
 fig = fig_gen()
-fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1a.svg"
+fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1a.pdf"
 savefig(fig,fname)
 display(fig)

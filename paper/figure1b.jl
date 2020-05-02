@@ -9,28 +9,23 @@ function fig_gen()
 
     fig       = plot(yscale=:log10,xscale=:log10,xlabel="#dof",ylabel="error")
     qorder    = (2,3,4)
-    h0        = 0.1
-    niter     = 4
+    h0        = 1.0
+    niter     = 6
     operators = (Elastostatic(dim=2,μ=1,λ=1),Elastodynamic(dim=2,λ=1,μ=1,ρ=1,ω=1))
-    op = operators[1]
-    p  = qorder[1]
     for op in operators
         # construct interior solution
         c    = rand(dim)
-        xout = (4,3)
+        xout = (3,3)
         u    = (x)   -> SingleLayerKernel(op)(xout,x)*c
         dudn = (x,n) -> transpose(DoubleLayerKernel(op)(xout,x,n))*c
-        # construct exterior solution
-        xin  = (0.3,0.2)
-        v    = (x)   -> SingleLayerKernel(op)(xin,x)*c
-        dvdn = (x,n) -> DoubleLayerKernel(op)(xin,x,n)*c
         for p in qorder
+            conv_order = p
             meshgen!(Γ,h0)
             ee_interior = []
             ee_exterior = []
             dof         = []
             for _ in 1:niter
-                quadgen!(Γ,(p,),gausslegendre)
+                quadgen!(Γ,(p,),algo1d=gausslegendre)
                 S  = SingleLayerOperator(op,Γ)
                 D  = DoubleLayerOperator(op,Γ)
                 δS = GreensCorrection(S)
@@ -40,23 +35,18 @@ function fig_gen()
                 γ₁u       = γ₁(dudn,Γ)
                 ee = error_interior_green_identity(S+δS,D+δD,γ₀u,γ₁u)
                 push!(ee_interior,norm(ee,Inf)/norm(γ₀u,Inf))
-                # test exterior Green identity
-                γ₀v       = γ₀(v,Γ)
-                γ₁v       = γ₁(dvdn,Γ)
-                ee = error_exterior_green_identity(S+δS,D+δD,γ₀v,γ₁v)
-                norm(ee,Inf)
-                push!(ee_exterior,norm(ee,Inf)/norm(γ₀v,Inf))
                 push!(dof,length(Γ))
                 refine!(Γ)
             end
-            plot!(fig,dof,ee_interior,label=Nystrom.getname(op)*": p=$p",m=:x)
-            # plot!(fig,dof,ee_exterior,label=Nystrom.getname(op)*": p=$p",m=:x)
+            plot!(fig,dof,ee_interior,label=Nystrom.getname(op)*": p=$p",m=:o)
+            plot!(fig,dof,1 ./(dof.^conv_order)*dof[end]^(conv_order)*ee_interior[end],
+                  label="",linewidth=4)
         end
     end
     return fig
 end
 
 fig = fig_gen()
-fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1b.svg"
+fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1b.pdf"
 savefig(fig,fname)
 display(fig)

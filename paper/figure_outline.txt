@@ -27,4 +27,3 @@ Figure 5 --> Sensitivity of solution to location of sources points
 Figure 6 --> Scattering by plane wave using CFIE
        6a --> 2d soundsoft circle
        6b --> 3d soundsoft sphere
-
