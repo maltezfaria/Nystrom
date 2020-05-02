@@ -4,31 +4,29 @@
 Basic quadrature structure for integration over an object in `R^N`.
 
 The type parameter `Q` is used to encode information about the type of
-quadrature used (e.g. quadrature rule). `Q=Any` means no information is
-provided.
+quadrature used (e.g. quadrature rule). 
 
 The `elements` field contains in its `i` entry the indices of the nodes which
 form the `i` element, in case such an element structure is present. This is
 sometimes useful for routines which iterating over the `elements` instead of just the `nodes`.
 """
-struct Quadrature{Q,N,T}
+struct Quadrature{N,T}
     nodes::Vector{Point{N,T}}
     weights::Vector{T}
     normals::Vector{Normal{N,T}}
     elements::Vector{Vector{Int}}
     bodies::Vector{Vector{Int}}
 end
-Quadrature{Q,N,T}() where {Q,N,T}= Quadrature{Q,N,T}([],[],[],[],[])
+Quadrature{N,T}() where {Q,N,T}= Quadrature{N,T}([],[],[],[],[])
 
-ambient_dim(q::Quadrature{Q,N}) where {Q,N}   = N
-geometric_dim(q::Quadrature{Q,N}) where {Q,N} = geometric_dim(Q)
-quadrature_type(q::Quadrature{Q}) where {Q}   = Q
+ambient_dim(q::Quadrature{N}) where {Q,N}   = N
+geometric_dim(q::Quadrature{N}) where {Q,N} = geometric_dim(Q)
 
 getweights(q::Quadrature)  = q.weights
 getnodes(q::Quadrature)    = q.nodes
 getnormals(q::Quadrature)  = q.normals
 getelements(q::Quadrature) = q.elements
-getbodies(q::Quadrature) = q.elements
+getbodies(q::Quadrature)   = q.bodies
 
 Base.length(q::Quadrature) = length(getnodes(q))
 
@@ -104,42 +102,23 @@ function idx_nodes_to_elements(q::Quadrature)
 end
 
 """
-    TensorQuadrature{S}
+    _rescale_quadrature(p,origin,width,algo1d)
 
-A singleton type representing a quadrature of size `S`, where `S` is usually a tuple.
-"""
-struct TensorQuadrature{S} end
-#NOTE: figure out how to restrict the type parameter `S` above to reinforce it is `NTuple{N,Int} where {N}`
-
-Base.length(q::TensorQuadrature) = length(typeof(q))
-Base.size(q::TensorQuadrature)   = size(typeof(q))
-Base.length(::Type{TensorQuadrature{S}}) where {S} = prod(S)
-Base.size(::Type{TensorQuadrature{S}}) where {S} = S
-
-
-"""
-    _rescale_quadrature(p,origin,width,algo)
-
-Convenience method to rescale the `p` points 1d quadrature rule `algo` from
+Convenience method to rescale the `p` points 1d quadrature rule `algo1d` from
 `[-1,1]` to an interval given by `[origin,origin+width]`.
 
-It is assume that `algo` is callable in the following: `nodes,weights =
-algo(p)`, where `nodes` and `weights` are vectors.
+It is assume that `algo1d` is callable in the following: `nodes,weights =
+algo1d(p)`, where `nodes` and `weights` are vectors.
 """
-function _rescale_quadrature(p,origin,width,algo)
-    nodes, weights = algo(p)
+function _rescale_quadrature(p,origin,width,algo1d)
+    nodes, weights = algo1d(p)
     @. nodes       = nodes*width/2            # shift to [-w/2,w/2]
     @. nodes       = nodes + width/2 + origin #shift to [a,b]
     @. weights     = weights * width/2
     return nodes, weights
 end
 
-tensorquadrature(p::NTuple,args...;kwargs...) = tensorquadrature(TensorQuadrature{p}(),args...;kwargs...)
-
-function tensorquadrature(q::TensorQuadrature,el::Cuboid,algo)
-    Q = typeof(q)
-    N = dimension(el)
-    p = size(Q)
+function tensorquadrature(p::NTuple{N},el::Cuboid{N},algo) where {N}
     nodes1d   = Vector{Vector{Float64}}(undef,N)
     weights1d = Vector{Vector{Float64}}(undef,N)
     for n in 1:N
@@ -153,16 +132,15 @@ function tensorquadrature(q::TensorQuadrature,el::Cuboid,algo)
     for (n,weight) in enumerate(Iterators.product(weights1d...))
         weights[n] = prod(weight)
     end
-    return Quadrature{Q,N,Float64}(nodes,weights,[],[],[])
+    return Quadrature{N,Float64}(nodes,weights,[],[],[])
 end
 
-function tensorquadrature(q::TensorQuadrature,surf::ParametricSurface{M,N,T},algo) where {M,N,T}
-    Q = typeof(q)
-    quad = Quadrature{Q,N,T}()
+function tensorquadrature(p::NTuple{M},surf::ParametricSurface{M,N,T},algo) where {M,N,T}
+    quad = Quadrature{N,T}()
     for element in  getelements(surf)
         # compute quadrature on reference element
         push!(quad.elements,[])
-        ref_quad = tensorquadrature(q,element,algo) # quadrature in reference element
+        ref_quad = tensorquadrature(p,element,algo) # quadrature in reference element
         for (node,weight) in zip(getnodes(ref_quad),getweights(ref_quad))
             push!(quad.nodes,surf(node))
             push!(quad.elements[end],length(quad.nodes))
@@ -182,14 +160,15 @@ function tensorquadrature(q::TensorQuadrature,surf::ParametricSurface{M,N,T},alg
     return quad
 end
 
-function tensorquadrature(q::TensorQuadrature,bdy::ParametricBody{M,N,T},algo) where {M,N,T}
-    Q = typeof(q)
-    quad = Quadrature{Q,N,T}()
+tensorquadrature(p::Int,bdy::ParametricBody{M},args...;kwargs...) where {M} = tensorquadrature(ntuple(i->p,M),bdy,args...;kwargs...)
+
+function tensorquadrature(p::NTuple{M},bdy::ParametricBody{M,N,T},algo1d) where {M,N,T}
+    quad = Quadrature{N,T}()
     for surf in bdy.patches
         for element in  getelements(surf)
             # compute quadrature on reference element
             push!(quad.elements,[])
-            ref_quad = tensorquadrature(q,element,algo) # quadrature in reference element
+            ref_quad = tensorquadrature(p,element,algo1d) # quadrature in reference element
             for (node,weight) in zip(getnodes(ref_quad),getweights(ref_quad))
                 push!(quad.nodes,surf(node))
                 push!(quad.elements[end],length(quad.nodes))
@@ -211,16 +190,15 @@ function tensorquadrature(q::TensorQuadrature,bdy::ParametricBody{M,N,T},algo) w
     return quad
 end
 
-function tensorquadrature(q::TensorQuadrature,geo::Vector{ParametricBody{M,N,T}},algo) where {M,N,T}
-    Q = typeof(q)
-    quad = Quadrature{Q,N,T}()
+function tensorquadrature(p::NTuple{M},geo::Vector{ParametricBody{M,N,T}},algo) where {M,N,T}
+    quad = Quadrature{N,T}()
     for bdy in geo
         push!(quad.bodies,[])
         for surf in bdy.patches
             for element in  getelements(surf)
                 # compute quadrature on reference element
                 push!(quad.elements,[])
-                ref_quad = tensorquadrature(q,element,algo) # quadrature in reference element
+                ref_quad = tensorquadrature(p,element,algo) # quadrature in reference element
                 for (node,weight) in zip(getnodes(ref_quad),getweights(ref_quad))
                     push!(quad.nodes,surf(node))
                     push!(quad.elements[end],length(quad.nodes))
@@ -252,8 +230,7 @@ struct GmshQuadrature end
 
 function gmshquadrature(qtype,dim,tag=-1)
     N = dim+1
-    Q = GmshQuadrature
-    quad = Quadrature{Q,N,Float64}()
+    quad = Quadrature{N,Float64}()
     etypes, etags, ntags = gmsh.model.mesh.getElements(dim,tag)
     for i in 1:length(etypes)
         etype = etypes[i]
@@ -291,7 +268,7 @@ end
 ################################################################################
 ## PLOT RECIPES
 ################################################################################
-@recipe function f(quad::Quadrature{<:Any,2})
+@recipe function f(quad::Quadrature{2})
     legend --> false
     grid   --> false
     aspect_ratio --> :equal
@@ -309,7 +286,7 @@ end
     end
 end
 
-@recipe function f(quad::Quadrature{<:Any,3})
+@recipe function f(quad::Quadrature{3})
     legend --> false
     grid   --> false
     # aspect_ratio --> :equal

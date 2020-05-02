@@ -98,29 +98,24 @@ function GreensCorrection(iop::IntegralOperator{T,K}, basis, γ₁_basis) where 
 end
 
 function invert_green_matrix(L::Matrix{Mat{M,N,T,S}}) where {M,N,T,S}
-    # rtol = sqrt(eps(real(float(one(T)))))
     Lfull = Matrix(L)
     Linv = invert_green_matrix(Lfull)
     return matrix_to_tensor(Mat{M,N,eltype(Linv),S},Linv)
 end
 
-function invert_green_matrix(L::AbstractMatrix{T}) where {T<:Number}
+function invert_green_matrix(L::AbstractMatrix{T},S=Float64) where {T<:Number}
     if T==Float64
-        Ldouble = Double64.(L)
-        # Ldouble = BigFloat.(L)
+        L2 = S.(L)
     elseif T==ComplexF64
-        Ldouble = ComplexDF64.(L)
-        # Ldouble = Complex{BigFloat}.(L)
+        L2 = Complex{S}.(L)
     end
-    Linv = @suppress pinv(Ldouble)
+    Linv = @suppress pinv(L2,rtol=1e-8)
     return Linv
-    # rtol = sqrt(eps(real(float(one(T)))))
-    # return pinv(L;rtol=rtol)
 end
 
 function GreensCorrection(iop::IntegralOperator,xs)
     # construct greens "basis" from source locations xs
-    op     = iop.kernel.op
+    op        = iop.kernel.op
     basis     = [y->SingleLayerKernel(op)(x,y) for x in xs]
     γ₁_basis  = [(y,ny)->transpose(DoubleLayerKernel(op)(x,y,ny)) for x in xs]
     GreensCorrection(iop,basis,γ₁_basis)
@@ -128,7 +123,7 @@ end
 
 function GreensCorrection(iop::IntegralOperator)
     nquad  = mapreduce(x->length(x),max,getelements(iop.Y))
-    nbasis = 2*nquad + 1
+    nbasis = 2*nquad + 2
     # construct source basis
     xs     = source_gen(iop.Y,nbasis)
     GreensCorrection(iop,xs)
@@ -139,7 +134,7 @@ error_derivative_green_formula(ADL,H,γ₀u,γ₁u,σ)           = σ*γ₁u + A
 error_interior_green_identity(SL,DL,γ₀u,γ₁u)              = error_green_formula(SL,DL,γ₀u,γ₁u,-1/2)
 error_interior_derivative_green_identity(ADL,H,γ₀u,γ₁u)   = error_derivative_green_formula(ADL,H,γ₀u,γ₁u,-1/2)
 error_exterior_green_identity(SL,DL,γ₀u,γ₁u)              = error_green_formula(SL,DL,γ₀u,γ₁u,1/2)
-error_exterior_derivative_greens_identity(ADL,H,γ₀u,γ₁u)  = error_derivative_green_formula(ADL,H,γ₀u,γ₁u,-1/2)
+error_exterior_derivative_green_identity(ADL,H,γ₀u,γ₁u)  = error_derivative_green_formula(ADL,H,γ₀u,γ₁u,+1/2)
 
 """
     near_interaction_list(X::Quadrature,Y::Quadrature;[tol],)

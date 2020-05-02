@@ -18,6 +18,8 @@ struct ParametricSurface{M,N,T}
     elements::Vector{Cuboid{M,T}}
 end
 
+ParametricSurface(surf,domain::Cuboid{M,T}) where {M,T} = ParametricSurface{M,M+1,Float64}(surf,domain,[domain])
+
 """
     GmshParametricSurface{M}
 

@@ -1,7 +1,0 @@
-[deps]
-GeometryTypes = "4d00f742-c7ba-57c2-abde-4428a4b178cb"
-GmshTools = "82e2f556-b1bd-5f1a-9576-f93c0da5f0ee"
-LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
-LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-Nystrom = "33e8372d-7e06-487f-b481-26071f42257e"
-Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"

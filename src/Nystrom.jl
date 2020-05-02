@@ -7,6 +7,8 @@ using RecipesBase
 using GmshTools
 using DoubleFloats
 using Suppressor
+using FastGaussQuadrature
+using IterativeSolvers
 
 import ForwardDiff # used for computing jacobian
 
@@ -26,9 +28,13 @@ export
     tensorquadrature,
     gmshquadrature,
     Domain,
+    getnodes,
+    getnormals,
+    getweights,
     # operators
     Laplace,
     Helmholtz,
+    HelmholtzPML,
     Elastostatic,
     Elastodynamic,
     Stokes,
@@ -99,7 +105,7 @@ include("Operators/assemble.jl")
 ################################################################################
 include("Utils/testutils.jl")
 include("Utils/geometryutils.jl")
-# include("Utils/math.jl")
+include("Utils/math.jl")
 include("Utils/conversions.jl")
 # include("Utils/utils.jl")
 

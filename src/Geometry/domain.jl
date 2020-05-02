@@ -1,8 +1,8 @@
 struct Domain{N,T}
     bodies::Vector
-    quadrature::Quadrature{<:Any,N,T}
+    quadrature::Quadrature{N,T}
 end
-Domain{N,T}() where {N,T} = Domain{N,T}([],Quadrature{Any,N,T}())
+Domain{N,T}() where {N,T} = Domain{N,T}([],Quadrature{N,T}())
 Domain{N}(args...) where {N} = Domain{N,Float64}(args...)
 Domain(;dim) = Domain{dim}()
 
@@ -10,7 +10,7 @@ ambient_dim(Γ::Domain{N}) where {N} = N
 
 Base.push!(Γ::Domain,bdy::ParametricBody) = push!(Γ.bodies,bdy)
 
-function quadgen!(Γ::Domain{N,T},p,algo1d) where {N,T}
+function quadgen!(Γ::Domain{N,T},p;algo1d=gausslegendre) where {N,T}
     empty!(Γ.quadrature)
     for bdy in getbodies(Γ)
         if bdy isa ParametricBody

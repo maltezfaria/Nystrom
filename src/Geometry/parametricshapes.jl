@@ -8,7 +8,7 @@ end
 circle(;radius=1,center=zeros(2)) = ellipsis(;paxis=radius*ones(2),center=center)
 
 function kite(;radius=1,center=ones(2))
-    f(s) = center .+ rad.*[cospi(s[1]) + 0.65*cospi(2*s[1]) - 0.65,
+    f(s) = center .+ radius.*[cospi(s[1]) + 0.65*cospi(2*s[1]) - 0.65,
                 1.5*sinpi(s[1])]
     domain = Cuboid(-1.0,1.0)
     surf   = ParametricSurface{2}(f,domain,[domain])
