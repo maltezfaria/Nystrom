@@ -76,3 +76,50 @@ function (HS::HyperSingularKernel{T,S})(x,y,nx,ny)::T where {T,S<:Helmholtz}
         return  transpose(nx)*(term1 + term2) * ny
     end
 end
+
+struct HelmholtzPML{N,T,S,P} <: AbstractPDE{N}
+    k::T
+    τ::S
+    A::P
+end
+
+getname(::HelmholtzPML) = "HelmholtzPML"
+
+default_kernel_type(::HelmholtzPML)  = ComplexF64
+default_density_type(::HelmholtzPML) = ComplexF64
+
+# Single Layer
+function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:HelmholtzPML}
+    τ = SL.op.τ
+    x = τ(x)
+    y = τ(y)
+    N = ambient_dim(S)
+    k = SL.op.k
+    r = x .- y
+    d = sqrt(sum(r.^2))
+    d==0 && return zero(T)
+    if N==2
+        return im/4 * hankelh1(0,k*d)
+    elseif N==3
+        return 1/(4π)/d * exp(im*k*d)
+    end
+end
+
+# Double Layer Kernel
+function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:HelmholtzPML}
+    τ  = DL.op.τ
+    A  = DL.op.A(y)
+    x  = τ(x)
+    y  = τ(y)
+    ny = A*ny
+    N  = ambient_dim(S)
+    k  = DL.op.k
+    r  = x .- y
+    d  = sqrt(sum(r.^2))
+    d == 0 && (return zero(T))
+    if N==2
+        return im*k/4/d * hankelh1(1,k*d) .* vdot(r,ny)
+    elseif N==3
+        return 1/(4π)/d^2 * exp(im*k*d) * ( -im*k + 1/d ) * vdot(r,ny)
+    end
+end

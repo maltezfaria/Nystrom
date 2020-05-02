@@ -3,7 +3,7 @@
     return sum( a .* b)
 end
 
-function window(t,t0,t1)::Float64
+function window(t,t0,t1)
     if abs(t) <= t0
         return 1
     elseif t0 < abs(t) < t1
@@ -14,10 +14,22 @@ function window(t,t0,t1)::Float64
     end
 end
 
-function mysqrt(c::Number)
-    θ = mod(angle(c),2π)/2
-    ρ = sqrt(norm(c))
-    return ρ*Complex(cos(θ),sin(θ))
+function complex_scaling(t,a,θ)
+    if abs(t) <= a
+        t
+    elseif t < -a
+        # t  + im*(t+a)*sin(θ)
+        -a + (t+a)*exp(im*θ)
+    else # t>a
+        # t  + im*(t-a)*sin(θ)
+        a + (t-a)*exp(im*θ)
+    end
 end
 
-
+function derivative_complex_scaling(t,a,θ)
+    if abs(t) <= a
+        ComplexF64(1)
+    else
+        exp(im*θ)
+    end
+end

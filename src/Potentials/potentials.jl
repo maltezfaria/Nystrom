@@ -8,10 +8,10 @@ Base.setindex(σ::SurfaceDensity,args...) = setindex(σ.vals,args...)
 
 SurfaceDensity(etype::DataType,surf) = SurfaceDensity(zeros(etype,length(surf)),surf)
 
-# function gmres!(σ::SurfaceDensity,A,μ::SurfaceDensity,args...;kwargs...)
-#     gmres!(σ.vals,A,μ.vals,args...;kwargs...)
-#     return σ
-# end
+function IterativeSolvers.gmres!(σ::SurfaceDensity,A,μ::SurfaceDensity,args...;kwargs...)
+    gmres!(σ.vals,A,μ.vals,args...;kwargs...)
+    return σ
+end
 
 function γ₀(f,X)
     vals = [f(x) for x in getnodes(X)]
@@ -54,7 +54,7 @@ end
 function (pot::IntegralPotential)(::DoubleLayer,σ::AbstractVector,x)
     f = pot.kernel
     Y = pot.surface
-    iter = zip(getnodes(Y),getweights(Y),getnormals(Y),σ.vals)
+    iter = zip(getnodes(Y),getweights(Y),getnormals(Y),σ)
     out  = mapreduce(+,iter) do (y,w,ny,σ)
         f(x,y,ny)*σ*w
     end

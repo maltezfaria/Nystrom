@@ -72,7 +72,7 @@ function sphere_sources_lebedev(;nsources, radius=10, center=Point(0.,0.,0.))
     lpts = lebedev_points(nsources)
     Xs = Point{3,Float64}[]
     for pt in lpts
-        push!(Xs,r*pt .+ center)
+        push!(Xs,radius*pt .+ center)
     end
     return Xs
 end
