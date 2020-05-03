@@ -75,9 +75,7 @@ function GreensCorrection(iop::IntegralOperator{T,K}, basis, γ₁_basis) where 
 
     # compute the interpolation matrix
     a,b       = combined_field_coefficients(kernel)
-    near_list = near_interaction_list(X,Y,tol=0)
-    # _prune_interaction_list!(near_list,X,Y)
-
+    near_list = nearest_point_list(X.quadrature,Y.quadrature,tol=1)
     for i in 1:m # loop over rows
         for (idx_el,idx_node) in near_list[i]
             yels = getelements(Y)[idx_el]
@@ -87,11 +85,15 @@ function GreensCorrection(iop::IntegralOperator{T,K}, basis, γ₁_basis) where 
             L[1:nnear,:]     = γ₀B[yels,:]
             L[nnear+1:end,:] = γ₁B[yels,:]
             invL = invert_green_matrix(L)
-            w[i]        = (R[idx_node:idx_node,:]*invL)*D |> vec
+            if getnodes(X)[i] == getnodes(Y)[idx_node]
+                w[i]        = (R[i:i,:]*invL)*D |> vec
+            else
+                w[i]        = ((R[i:i,:]+γ₀B[i:i,:]/2)*invL)*D |> vec
+            end
             idx_near[i] = copy(yels)
-            #NOTE: making a copy is important here or you get issues when
-            #mutating the GreesCorrection since mutating the non-zero indices of
-            #one row would inadvertently affect another.
+        #NOTE: making a copy is important here or you get issues when
+        #mutating the GreesCorrection since mutating the non-zero indices of
+        #one row would inadvertently affect another.
         end
     end
     return GreensCorrection{T}(kernel,X,Y,w,idx_near)
@@ -103,13 +105,13 @@ function invert_green_matrix(L::Matrix{Mat{M,N,T,S}}) where {M,N,T,S}
     return matrix_to_tensor(Mat{M,N,eltype(Linv),S},Linv)
 end
 
-function invert_green_matrix(L::AbstractMatrix{T},S=Float64) where {T<:Number}
+function invert_green_matrix(L::AbstractMatrix{T},S=Double64) where {T<:Number}
     if T==Float64
         L2 = S.(L)
     elseif T==ComplexF64
         L2 = Complex{S}.(L)
     end
-    Linv = @suppress pinv(L2,rtol=1e-8)
+    Linv = @suppress pinv(L2,rtol=eps(S))
     return Linv
 end
 
@@ -123,7 +125,7 @@ end
 
 function GreensCorrection(iop::IntegralOperator)
     nquad  = mapreduce(x->length(x),max,getelements(iop.Y))
-    nbasis = 2*nquad + 2
+    nbasis = 3*nquad + 2
     # construct source basis
     xs     = source_gen(iop.Y,nbasis)
     GreensCorrection(iop,xs)
@@ -137,13 +139,13 @@ error_exterior_green_identity(SL,DL,γ₀u,γ₁u)              = error_green_fo
 error_exterior_derivative_green_identity(ADL,H,γ₀u,γ₁u)  = error_derivative_green_formula(ADL,H,γ₀u,γ₁u,+1/2)
 
 """
-    near_interaction_list(X::Quadrature,Y::Quadrature;[tol],)
+    near_interaction_list(X,Y;[tol],)
 
 Return a vector of `length(X)` elements, where each element contains the index
 in `Y` of nodes for which `norm(x-y)<tol`. For points which belong to the same
 element in `Y`, only the closest one is returned.
 """
-function near_interaction_list(X,Y; tol=-1, hfactor=tol≥0 ? 0 : 5)
+function near_interaction_list(X,Y; tol=0)
     n = length(X)
     list = [Vector{Tuple{Int,Int}}() for _ = 1:n] # (idxel, idxnode) of near points for each x ∈ X
     xnodes = getnodes(X)
@@ -153,11 +155,63 @@ function near_interaction_list(X,Y; tol=-1, hfactor=tol≥0 ? 0 : 5)
         x = xnodes[i]
         for nel in 1:length(yels)
             idxnodes = yels[nel]
-            hloc = local_mesh_size(Y,nel)
             d = map(j -> norm(x .- ynodes[j]),idxnodes)
             dmin,idx_min = findmin(d)
-            if dmin ≤ max(hfactor*hloc,tol)
+            if dmin ≤ tol
                 push!(list[i],(nel,idxnodes[idx_min]))
+            end
+        end
+    end
+    return list
+end
+
+"""
+    nearest_point_list(X,Y;[tol])
+
+Return a vector of `length(X)` elements, where each element contains the index
+in `Y` of nodes for which `norm(x-y)<tol`. For points which belong to the same
+element in `Y`, only the closest one is returned.
+"""
+function nearest_point_list(X,Y; tol=0)
+    n,m  = length(X),length(Y)
+    list = [Vector{Tuple{Int,Int}}() for _ = 1:n] # (idxel, idxnode) of near points for each x ∈ X
+    xnodes = getnodes(X)
+    ynodes = getnodes(Y)
+    in2e   = idx_nodes_to_elements(Y)
+    for i in 1:n
+        x = xnodes[i]
+        d = map(j -> norm(x .- ynodes[j]),1:m)
+        dmin,idx_min = findmin(d)
+        if dmin ≤ tol
+            push!(list[i],(in2e[idx_min][1],idx_min))
+        end
+    end
+    return list
+end
+
+"""
+    near_interaction_list_bodies(X,Y;[tol],)
+
+Return a vector of `length(X)` elements, where each element contains the index
+in `Y` of nodes for which `norm(x-y)<tol`. For points which belong to the same
+body in `Y`, only the closest one is returned.
+"""
+function near_interaction_list_bodies(X,Y; tol=0)
+    n         = length(X)
+    list      = [Vector{Tuple{Int,Int}}() for _ = 1:n] # (idxel, idxnode) of near points for each x ∈ X
+    xnodes    = getnodes(X)
+    ynodes    = getnodes(Y)
+    bdy2nodes      = idx_bodies_to_nodes(Y)
+    nodes2elements = idx_nodes_to_elements(Y)
+    for i in 1:n
+        x = xnodes[i]
+        for k in 1:length(getbodies(Y))
+            idxnodes = bdy2nodes[k]
+            d = map(j -> norm(x .- ynodes[j]),idxnodes)
+            dmin,idx_min = findmin(d)
+            if dmin ≤ tol
+                imin = idxnodes[idx_min]
+                push!(list[i],(nodes2elements[imin][1],imin))
             end
         end
     end

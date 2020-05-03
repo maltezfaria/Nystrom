@@ -52,36 +52,17 @@ function Base.empty!(q::Quadrature)
     return q
 end
 
-function _prune_interaction_list!(list,X,Y)
-    for i in 1:length(X)
-        x = getnodes(X)[i]
-        isempty(list[i]) && continue
-        dmin,nmin,jmin = Inf,-1,-1
-        for (n,j) in list[i]
-            y = getnodes(Y)[j]
-            d = norm(x - y)
-            if d < dmin
-                dmin = d
-                nmin = n
-                jmin = j
-            end
-        end
-        list[i] = [(nmin,jmin)]
-    end
-    return list
-end
-
-function local_mesh_size(Y,iel)
+function local_mesh_size(Y,iel,inode)
     nodes = getnodes(Y)
     idxs  = getelements(Y)[iel]
-    nidxs = length(idxs)
-    hmax  = 0
-    for i in 1:nidxs
-        for j in i+1:nidxs
-            hmax = max(hmax,norm(nodes[i] .- nodes[j]))
+    hloc = mapreduce(min,idxs) do i
+        if i==iel
+            d = Inf
+        else
+            d = norm(nodes[iel]-nodes[i])
         end
     end
-    return hmax
+    return hloc
 end
 
 """
@@ -99,6 +80,52 @@ function idx_nodes_to_elements(q::Quadrature)
         end
     end
     return list
+end
+
+"""
+    idx_elements_to_bodies(q::Quadrature)
+
+For each element in `q`, return the indices of the bodies to which it belongs.
+
+Depending on the quadrature type, more efficient methods can be defined and overloaded if needed.
+"""
+function idx_elements_to_bodies(q::Quadrature)
+    list = Vector{Int}(undef,length(getelements(q)))
+    for n in 1:length(getbodies(q))
+        for i in getbodies(q)[n]
+            list[i] = n
+        end
+    end
+    return list
+end
+
+"""
+    idx_bodies_to_nodes(q::Quadrature)
+
+For each body in `q`, return the indices of the nodes to belonging to it.
+
+Depending on the quadrature type, more efficient methods can be defined and overloaded if needed.
+"""
+function idx_bodies_to_nodes(q::Quadrature)
+    list = [Int[] for _ in 1:length(getbodies(q))]
+    for n in 1:length(getbodies(q))
+        bdy = getbodies(q)[n]
+        els = getelements(q)[bdy]
+        for i in els
+            append!(list[n],i)
+        end
+    end
+    return list
+end
+
+function _add_body_to_interaction_list!(list,X,Y)
+    el2bdy   = idx_elements_to_bodies(Y)
+    new_list = map(list) do l
+        map(l) do (iel,inode)
+            (el2bdy[iel],iel,inode)
+        end
+    end
+    return new_list
 end
 
 """

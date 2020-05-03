@@ -12,6 +12,7 @@ function fig_gen()
     h0        = 1.0
     niter     = 6
     operators = (Laplace(dim=2),Helmholtz(dim=2,k=2π))
+    # operators = (Helmholtz(dim=dim,k=1),)
     for op in operators
         # construct interior solution
         xout = (3,3)

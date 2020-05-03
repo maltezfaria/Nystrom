@@ -24,6 +24,18 @@ function quadgen!(Γ::Domain{N,T},p;algo1d=gausslegendre) where {N,T}
     return Γ
 end
 
+function Base.append!(Γ::Domain,Γa::Domain)
+    append!(Γ.bodies,Γa.bodies)
+    append!(Γ.quadrature,Γa.quadrature)
+    return Γ
+end
+
+function Base.append!(Γ,Γa)
+    append!(Γ.bodies,Γa.bodies)
+    append!(Γ.quadrature,Γa.quadrature)
+    return Γ
+end
+
 function meshgen!(Γ::Domain,h)
     for bdy in getbodies(Γ)
         meshgen!(bdy,h)
