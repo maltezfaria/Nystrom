@@ -36,7 +36,6 @@ function fig_gen()
                 push!(ee_interior,norm(ee,Inf)/norm(γ₀u,Inf))
                 @show length(Γ)
                 push!(dof,length(Γ))
-                @show sum(Γ.quadrature.weights)
                 refine!(Γ)
             end
             dof = sqrt.(dof) # roughly the inverse of the mesh size

@@ -10,7 +10,7 @@ function fig_gen()
     fig       = plot(yscale=:log10,xscale=:log10,xlabel="#dof",ylabel="error")
     qorder    = (2,3,4)
     h0        = 1.0
-    niter     = 6
+    niter     = 8
     operators = (Laplace(dim=2),Helmholtz(dim=2,k=2π))
     # operators = (Helmholtz(dim=dim,k=1),)
     for op in operators
@@ -48,6 +48,6 @@ function fig_gen()
 end
 
 fig = fig_gen()
-fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1a.pdf"
-savefig(fig,fname)
+# fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1a.pdf"
+# savefig(fig,fname)
 display(fig)
