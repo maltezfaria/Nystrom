@@ -58,9 +58,9 @@ function sphere_sources_uniform(;nsources, radius=10, center=[0 0 0])
         φ = π*(i-1/2)/n
         for j = 1:n
             θ = 2π*(j - 1/2)/n
-            x = center[1] + r*sin(φ)*cos(θ)
-            y = center[2] + r*sin(φ)*sin(θ)
-            z = center[3] + r*cos(φ)
+            x = center[1] + radius*sin(φ)*cos(θ)
+            y = center[2] + radius*sin(φ)*sin(θ)
+            z = center[3] + radius*cos(φ)
             pt = Point(x,y,z)
             push!(Xs, pt)
         end
@@ -225,6 +225,8 @@ function lebedev_points(n)
 end
 
 function sph_pt(theta,phi,r=1, center=[0 0 0])
+    theta = theta * pi/180
+    phi   = phi   * pi/180
     x = center[1] + r*sin(phi)*cos(theta)
     y = center[2] + r*sin(phi)*sin(theta)
     z = center[3] + r*cos(phi)
