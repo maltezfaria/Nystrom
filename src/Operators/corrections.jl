@@ -1,3 +1,88 @@
+# struct LazyGreensCorrection{T,K,S,V,U} <: AbstractMatrix{T}
+#     kernel::K
+#     X::S
+#     Y::V
+#     R::Matrix{T}
+#     L::Vector{U}
+#     idx_near::Vector{Vector{Int}}
+# end
+
+# function LazyGreensCorrection(iop::IntegralOperator,γ₀B,γ₁B,Op1,Op2)
+#     T = eltype(iop)
+#     kernel,X,Y  = iop.kernel, iop.X, iop.Y
+#     σ = X == Y ? -0.5 : 0.0
+#     # integrate the basis
+#     if kernel_type(iop) isa Union{SingleLayer,DoubleLayer}
+#         R  = error_green_formula(Op1,Op2,γ₀B,γ₁B,σ)
+#     elseif kernel_type(iop) isa Union{AdjointDoubleLayer,HyperSingular}
+#         R  = error_derivative_green_formula(Op1,Op2,γ₀B,γ₁B,σ)
+#     end
+#     nbasis = size(γ₀B,2)
+#     L      = Vector{Matrix{T}}(undef,length(getelements(Y)))
+#     for (i,idxnodes) in enumerate(getelements(Y))
+#         ninterp = length(idxnodes)
+#         M       = Matrix{T}(undef,2*ninterp,nbasis)
+#         M[1:ninterp,:]     = γ₀B[idxnodes,:]
+#         M[ninterp+1:end,:] = γ₁B[idxnodes,:]
+#         L[i]    = M
+#     end
+#     # near interaction
+#     near_list = nearest_point_list(X.quadrature,Y.quadrature,tol=1)
+#     idx_near    = [Vector{Int}() for _ in 1:length(getnodes(Y))]
+#     for i in 1:length(getnodes(Y)) # loop over rows
+#         for (idx_el,idx_node) in near_list[i]
+#             yels        = getelements(Y)[idx_el]
+#             idx_near[i] = copy(yels)
+#             #NOTE: making a copy is important here or you get issues when
+#             #mutating the GreesCorrection since mutating the non-zero indices of
+#             #one row would inadvertently affect another.
+#         end
+#     end
+#     return LazyGreensCorrection(kernel,X,Y,R,L,idx_near)
+# end
+
+# function LazyGreensCorrection(iop::IntegralOperator)
+#     nquad  = mapreduce(x->length(x),max,getelements(iop.Y)) # maximum number of nodes per element
+#     nbasis = 2*nquad + 2
+#     # construct source basis
+#     xs     = source_gen(iop.Y,nbasis)
+#     LazyGreensCorrection(iop,xs)
+# end
+
+# function LazyGreensCorrection(iop::IntegralOperator,xs)
+#     # construct greens "basis" from source locations xs
+#     op        = iop.kernel.op
+#     basis     = [y->SingleLayerKernel(op)(x,y) for x in xs]
+#     γ₁_basis  = [(y,ny)->transpose(DoubleLayerKernel(op)(x,y,ny)) for x in xs]
+#     LazyGreensCorrection(iop,basis,γ₁_basis)
+# end
+
+# function LazyGreensCorrection(iop::IntegralOperator,basis::Vector{<:Function},γ₁_basis::Vector{<:Function})
+#     T = eltype(iop)
+#     Y = iop.Y
+#     nbasis = length(basis)
+#     γ₀B    = Matrix{T}(undef,length(Y),nbasis)
+#     γ₁B    = Matrix{T}(undef,length(Y),nbasis)
+#     for n in 1:nbasis
+#         γ₀B[:,n] = γ₀(basis[n],Y)
+#         γ₁B[:,n] = γ₁(γ₁_basis[n],Y)
+#     end
+#     LazyGreensCorrection(iop,γ₀B,γ₁B)
+# end
+
+# function LazyGreensCorrection(iop::IntegralOperator,γ₀B::S,γ₁B::S,format=Matrix) where {S<:Matrix}
+#     T = eltype(iop)
+#     op,X,Y = iop.kernel.op, iop.X, iop.Y
+#     if kernel_type(iop) isa Union{SingleLayer,DoubleLayer}
+#         Op1 = IntegralOperator{T}(SingleLayerKernel(op),X,Y)
+#         Op2 = IntegralOperator{T}(DoubleLayerKernel(op),X,Y)
+#     elseif kernel_type(iop) isa Union{AdjointDoubleLayer,HyperSingular}
+#         Op1 = IntegralOperator{T}(AdjointDoubleLayerKernel(op),X,Y) |> Matrix
+#         Op2 = IntegralOperator{T}(HyperSingularKernel(op),X,Y) |> Matrix
+#     end
+#     LazyGreensCorrection(iop,γ₀B,γ₁B,format(Op1),format(Op2))
+# end
+
 """
     GreensCorrection{T,S} <: AbstractMatrix{T}
 
@@ -76,24 +161,27 @@ function GreensCorrection(iop::IntegralOperator{T,K}, basis, γ₁_basis) where 
     # compute the interpolation matrix
     a,b       = combined_field_coefficients(kernel)
     near_list = nearest_point_list(X.quadrature,Y.quadrature,tol=1)
+    invL      = Vector{Any}(undef,length(getelements(Y)))
     for i in 1:m # loop over rows
         for (idx_el,idx_node) in near_list[i]
             yels = getelements(Y)[idx_el]
             nnear = length(yels)
             L                = Matrix{T}(undef,2*nnear,nbasis)
             D                = [diagm(fill(a*one(T),nnear));diagm(fill(b*one(T),nnear))]
-            L[1:nnear,:]     = γ₀B[yels,:]
-            L[nnear+1:end,:] = γ₁B[yels,:]
-            invL = invert_green_matrix(L)
+            if !isassigned(invL,idx_el)
+                L[1:nnear,:]     = γ₀B[yels,:]
+                L[nnear+1:end,:] = γ₁B[yels,:]
+                invL[idx_el]     = invert_green_matrix(L)
+            end
             if getnodes(X)[i] == getnodes(Y)[idx_node]
-                w[i]        = (R[i:i,:]*invL)*D |> vec
+                w[i]        = (R[i:i,:]*invL[idx_el])*D |> vec
             else
-                w[i]        = ((R[i:i,:]+γ₀B[i:i,:]/2)*invL)*D |> vec
+                w[i]        = ((R[i:i,:]+γ₀B[i:i,:]/2)*invL[idx_el])*D |> vec
             end
             idx_near[i] = copy(yels)
-        #NOTE: making a copy is important here or you get issues when
-        #mutating the GreesCorrection since mutating the non-zero indices of
-        #one row would inadvertently affect another.
+            #NOTE: making a copy is important here or you get issues when
+            #mutating the GreesCorrection since mutating the non-zero indices of
+            #one row would inadvertently affect another.
         end
     end
     return GreensCorrection{T}(kernel,X,Y,w,idx_near)
@@ -101,17 +189,30 @@ end
 
 function invert_green_matrix(L::Matrix{Mat{M,N,T,S}}) where {M,N,T,S}
     Lfull = Matrix(L)
-    Linv = invert_green_matrix(Lfull)
+    Linv  = invert_green_matrix(Lfull)
     return matrix_to_tensor(Mat{M,N,eltype(Linv),S},Linv)
 end
 
-function invert_green_matrix(L::AbstractMatrix{T},S=Double64) where {T<:Number}
+function invert_green_matrix(L::AbstractMatrix{T},S=Float64) where {T<:Number}
     if T==Float64
-        L2 = S.(L)
+        Q,R = qr(L)
+        Linv = @suppress (R)*S.(adjoint(Q))
+        # L2 = S.(L)
+        # Linv = @suppress pinv(L2)
     elseif T==ComplexF64
-        L2 = Complex{S}.(L)
+        Q,R = qr(L)
+        Linv = @suppress pinv(R)*Complex{S}.(adjoint(Q))
+        # L2   = Complex{S}.(L)
+        # Linv = @suppress pinv(L2)
     end
-    Linv = @suppress pinv(L2,rtol=eps(S))
+    er = norm(L*Linv - I,Inf)
+    if er > 1e-8
+        if S===Float64
+            Linv = invert_green_matrix(L,Double64)
+        else
+            @debug er
+        end
+    end
     return Linv
 end
 
@@ -125,11 +226,29 @@ end
 
 function GreensCorrection(iop::IntegralOperator)
     nquad  = mapreduce(x->length(x),max,getelements(iop.Y))
-    nbasis = 3*nquad + 2
+    nbasis = 3*nquad
     # construct source basis
-    xs     = source_gen(iop.Y,nbasis)
+    xs     = source_gen(iop.Y,nbasis,kfactor=5)
     GreensCorrection(iop,xs)
 end
+
+# function GreensCorrection(c::LazyGreensCorrection)
+#     a,b = combined_field_coefficients(c.kernel)
+#     idx_near = c.idx_near
+#     T   = eltype(c)
+#     n   = length(c.X)
+#     w  = [Vector{T}() for _ in 1:n]
+#     for i in 1:n
+#         for (iel,inode) in idx_near[i]
+#             L         = c.L[iel]
+#             ninterp   = size(L,2)
+#             D           = [diagm(fill(a*one(T),nnear));diagm(fill(b*one(T),nnear))]
+#             invL        = invert_green_matrix(L)
+#             w[i]        = (c.R[i:i,:]*invL)*D |> vec
+#         end
+#     end
+#     return GreensCorrection(c.kernel,c.X,c.Y,w,c.idx_near)
+# end
 
 error_green_formula(SL,DL,γ₀u,γ₁u,σ)                      = σ*γ₀u + SL*γ₁u  - DL*γ₀u
 error_derivative_green_formula(ADL,H,γ₀u,γ₁u,σ)           = σ*γ₁u + ADL*γ₁u - H*γ₀u
