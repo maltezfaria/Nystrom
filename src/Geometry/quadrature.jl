@@ -72,7 +72,7 @@ For each node in `q`, return the indices of the elements to which it belongs.
 
 Depending on the quadrature type, more efficient methods can be defined and overloaded if needed.
 """
-function idx_nodes_to_elements(q::Quadrature)
+function idx_nodes_to_elements(q)
     list = [Int[] for _ in 1:length(q)]
     for n in 1:length(getelements(q))
         for i in getelements(q)[n]

@@ -9,11 +9,9 @@ function fig_gen()
 
     fig       = plot(yscale=:log10,xscale=:log10,xlabel="#dof",ylabel="error")
     qorder    = (2,3,4)
-    h0        = 0.5
-    niter     = 2
-    operators = (Elastostatic(dim=dim,μ=1,λ=1),Elastodynamic(dim=dim,λ=1,μ=1,ρ=1,ω=1))
-    op = operators[1]
-    p  = qorder[1]
+    h0        = 2.0
+    niter     = 4
+    operators = (Elastodynamic(dim=dim,λ=1,μ=1,ρ=1,ω=1),)
     for op in operators
         # construct interior solution
         c    = rand(dim)
@@ -26,7 +24,7 @@ function fig_gen()
             ee_interior = []
             dof         = []
             for _ in 1:niter
-                quadgen!(Γ,(p,p),gausslegendre)
+                quadgen!(Γ,(p,p),algo1d=gausslegendre)
                 S  = SingleLayerOperator(op,Γ)
                 D  = DoubleLayerOperator(op,Γ)
                 δS = GreensCorrection(S)
@@ -37,6 +35,7 @@ function fig_gen()
                 ee = error_interior_green_identity(S+δS,D+δD,γ₀u,γ₁u)
                 push!(ee_interior,norm(ee,Inf)/norm(γ₀u,Inf))
                 push!(dof,length(Γ))
+                @show dof[end], ee_interior[end]
                 refine!(Γ)
             end
             plot!(fig,dof,ee_interior,label=Nystrom.getname(op)*": p=$p",m=:o)

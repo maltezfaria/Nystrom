@@ -1,0 +1,227 @@
+"""
+    GreensCorrection{T,S} <: AbstractMatrix{T}
+
+An `AbstractMatrix` representing a correction to a singular boundary integral
+operator using density interpolation method with Greens functions [^1].
+
+The underlying representation is *sparse* since only near-field interactions need to be taken into account.
+This structure is typically added to the dense part of an integral operator as a correction.
+
+[^1] TODO: CITE OUR PAPER
+"""
+struct LazyGreensCorrection{T,S,U} <: AbstractMatrix{T}
+    iop::S
+    R::Matrix{T}
+    L::U
+    idxel_near::Vector{Int}
+end
+
+Base.size(c::LazyGreensCorrection) = size(c.iop)
+
+function Base.getindex(c::LazyGreensCorrection,i::Int,j::Int)
+    iop = c.iop
+    T = eltype(c)
+    a,b       = combined_field_coefficients(iop.kernel)
+    idx_el    = c.idxel_near[i]
+    idx_el < 0 && (return zero(T))
+    idx_nodes = getelements(iop.Y)[idx_el]
+    for (n,jnear) in enumerate(idx_nodes)
+        if jnear == j
+            L       = c.L[idx_el]
+            ninterp = length(idx_nodes)
+            D = [diagm(fill(a*one(T),ninterp));diagm(fill(b*one(T),ninterp))]
+            tmp = c.R[i:i,:]*invert_green_matrix(L)
+            w   = @views a*tmp[1:ninterp] + b*tmp[ninterp+1:end]
+            w = tmp*D
+            return w[n]
+        end
+    end
+    return zero(T)
+end
+
+function Base.Matrix(c::LazyGreensCorrection)
+    iop = c.iop
+    a,b = combined_field_coefficients(iop.kernel)
+    M = zero(c)
+    for i in 1:size(c,1)
+        idx_el    = c.idxel_near[i]
+        idx_el < 0 && continue
+        idx_nodes = getelements(iop.Y)[idx_el]
+        ninterp = length(idx_nodes)
+        L       = c.L[idx_el]
+        tmp     = c.R[i:i,:]*invert_green_matrix(L)
+        M[i,idx_nodes] = @views a*tmp[1:ninterp] + b*tmp[ninterp+1:end]
+    end
+    return M
+end
+
+function SparseArrays.sparse(c::LazyGreensCorrection)
+    m,n = size(c)
+    iop = c.iop
+    T   = eltype(c)
+    a,b = combined_field_coefficients(iop.kernel)
+    I = Int[]
+    J = Int[]
+    V = T[]
+    for i in 1:size(c,1)
+        idx_el    = c.idxel_near[i]
+        idx_el < 0 && continue
+        idx_nodes = getelements(iop.Y)[idx_el]
+        ninterp = length(idx_nodes)
+        L       = c.L[idx_el]
+        tmp     = c.R[i:i,:]*invert_green_matrix(L)
+        vals    = @views a*tmp[1:ninterp] + b*tmp[ninterp+1:end]
+        append!(I,fill(i,ninterp))
+        append!(J,idx_nodes)
+        append!(V,vals)
+    end
+    return sparse(I,J,V,m,n)
+end
+
+function LazyGreensCorrection(iop::IntegralOperator{T,K},Op1,Op2,basis,γ₁_basis,σ::Number) where {T,K}
+    kernel,X,Y  = iop.kernel, iop.X, iop.Y
+    op          = kernel.op
+    m,n         = length(X),length(Y)
+    L           = Vector{Matrix{T}}(undef,length(getelements(Y)))
+
+    nbasis      = length(basis)
+
+    # compute matrix of basis evaluated on Y
+    γ₀B = Matrix{T}(undef,length(Y),nbasis)
+    γ₁B = Matrix{T}(undef,length(Y),nbasis)
+    for n in 1:nbasis
+        γ₀B[:,n] = γ₀(basis[n],Y)
+        γ₁B[:,n] = γ₁(γ₁_basis[n],Y)
+    end
+
+    # integrate the basis
+    if kernel_type(iop) isa Union{SingleLayer,DoubleLayer}
+        R  = error_green_formula(Op1,Op2,γ₀B,γ₁B,σ)
+    elseif kernel_type(iop) isa Union{AdjointDoubleLayer,HyperSingular}
+        R   = error_derivative_green_formula(Op1,Op2,γ₀B,γ₁B,σ)
+    end
+
+    # compute the interpolation matrix
+    idxel_near = nearest_element_list(X,Y,tol=1)
+    for i in 1:m # loop over rows
+        idx_el = idxel_near[i]
+        idx_el < 0 && continue
+        idx_nodes  = getelements(Y)[idx_el]
+        ninterp    = length(idx_nodes)
+        M          = Matrix{T}(undef,2*ninterp,nbasis)
+        M[1:ninterp,:]     = γ₀B[idx_nodes,:]
+        M[ninterp+1:end,:] = γ₁B[idx_nodes,:]
+        L[idx_el]          = M
+    end
+    return LazyGreensCorrection(iop,R,L,idxel_near)
+end
+
+function LazyGreensCorrection(iop::IntegralOperator,Op1,Op2,xs::Vector{<:Point})
+    # construct greens "basis" from source locations xs
+    op        = iop.kernel.op
+    basis     = [y->SingleLayerKernel(op)(x,y) for x in xs]
+    γ₁_basis  = [(y,ny)->transpose(DoubleLayerKernel(op)(x,y,ny)) for x in xs]
+    σ = iop.X === iop.Y ? -0.5 : 0
+    LazyGreensCorrection(iop,Op1,Op2,basis,γ₁_basis,σ)
+end
+
+function LazyGreensCorrection(iop::IntegralOperator,Op1,Op2)
+    nquad  = mapreduce(x->length(x),max,getelements(iop.Y))
+    nbasis = 3*nquad + 2
+    # construct source basis
+    xs     = source_gen(iop.Y,nbasis)
+    LazyGreensCorrection(iop,Op1,Op2,xs)
+end
+
+function LazyGreensCorrection(iop::IntegralOperator,format=Matrix)
+    X,Y,op = iop.X, iop.Y, iop.kernel.op
+    T = eltype(iop)
+    # construct integral operators required for correction
+    if kernel_type(iop) isa Union{SingleLayer,DoubleLayer}
+        Op1 = IntegralOperator{T}(SingleLayerKernel(op),X,Y) |> format
+        Op2 = IntegralOperator{T}(DoubleLayerKernel(op),X,Y) |> format
+    elseif kernel_type(iop) isa Union{AdjointDoubleLayer,HyperSingular}
+        Op1 = IntegralOperator{T}(AdjointDoubleLayerKernel(op),X,Y) |> Matrix
+        Op2 = IntegralOperator{T}(HyperSingularKernel(op),X,Y) |> Matrix
+    end
+    LazyGreensCorrection(iop,Op1,Op2)
+end
+
+function invert_green_matrix(L::Matrix{Mat{M,N,T,S}}) where {M,N,T,S}
+    Lfull = Matrix(L)
+    Linv  = invert_green_matrix(Lfull)
+    return matrix_to_tensor(Mat{M,N,eltype(Linv),S},Linv)
+end
+
+function invert_green_matrix(L::AbstractMatrix{T},S=Float64) where {T<:Number}
+    if T==Float64
+        Q,R = qr(L)
+        Linv = @suppress pinv(R)*S.(adjoint(Q))
+        # L2 = S.(L)
+        # Linv = @suppress pinv(L2,rtol=eps(S))
+    elseif T==ComplexF64
+        Q,R = qr(L)
+        Linv = @suppress pinv(R)*Complex{S}.(adjoint(Q))
+        # L2   = Complex{S}.(L)
+        # Linv = @suppress pinv(L2,rtol=eps(S))
+    end
+    er = norm(L*Linv - I,Inf)
+    if er > 1e-12
+        if S===Float64
+            Linv = invert_green_matrix(L,Double64)
+        else
+            @debug er
+        end
+    end
+    return Linv
+end
+
+error_green_formula(SL,DL,γ₀u,γ₁u,σ)                      = σ*γ₀u + SL*γ₁u  - DL*γ₀u
+error_derivative_green_formula(ADL,H,γ₀u,γ₁u,σ)           = σ*γ₁u + ADL*γ₁u - H*γ₀u
+error_interior_green_identity(SL,DL,γ₀u,γ₁u)              = error_green_formula(SL,DL,γ₀u,γ₁u,-1/2)
+error_interior_derivative_green_identity(ADL,H,γ₀u,γ₁u)   = error_derivative_green_formula(ADL,H,γ₀u,γ₁u,-1/2)
+error_exterior_green_identity(SL,DL,γ₀u,γ₁u)              = error_green_formula(SL,DL,γ₀u,γ₁u,1/2)
+error_exterior_derivative_green_identity(ADL,H,γ₀u,γ₁u)  = error_derivative_green_formula(ADL,H,γ₀u,γ₁u,+1/2)
+
+"""
+    nearest_element_list(X,Y;[tol])
+
+Return a vector of integers, where the `i` entry of the vector gives the index of the nearest element in `Y` to the *ith*-node.
+
+An optional keywork argument `tol` can be passed so that only elements which are closer than `tol` are considered. If a node `x ∈ X` with index `i` has no element in `Y` closer than `tol`, the value -1 is stored indicating such a case.
+"""
+function nearest_element_list(X,Y; tol=0)
+    n,m  = length(X),length(Y)
+    list = fill(-1,n) # idxel of nearest element for each x ∈ X. -1 means there is not element in `Y` closer than `tol`
+    xnodes = getnodes(X)
+    ynodes = getnodes(Y)
+    in2e   = idx_nodes_to_elements(Y)
+    for i in 1:n
+        x = xnodes[i]
+        d = map(j -> norm(x .- ynodes[j]),1:m)
+        dmin,idx_min = findmin(d)
+        if dmin ≤ tol
+            @assert length(in2e[idx_min]) == 1
+            list[i] = in2e[idx_min] |>  first
+        end
+    end
+    return list
+end
+
+function LinearAlgebra.axpy!(a,X::LazyGreensCorrection,Y::Matrix)
+    iop = X.iop
+    c1,c2 = combined_field_coefficients(iop.kernel)
+    for i in 1:size(X,1)
+        idx_el    = X.idxel_near[i]
+        idx_el < 0 && continue
+        idx_nodes = getelements(iop.Y)[idx_el]
+        ninterp = length(idx_nodes)
+        L       = X.L[idx_el]
+        tmp     = X.R[i:i,:]*invert_green_matrix(L)
+        axpy!(a,c1*tmp[1:ninterp] + c2*tmp[ninterp+1:end],view(Y,i,idx_nodes))
+    end
+    return Y
+end
+
+Base.:+(X::LazyGreensCorrection,Y::Matrix) = axpy!(true,X,copy(Y))
+Base.:+(X::Matrix,Y::LazyGreensCorrection) = Y+X

@@ -11,9 +11,7 @@ function fig_gen()
     qorder    = (2,3,4)
     h0        = 1.0
     niter     = 6
-    operators = (Elastostatic(dim=2,μ=1,λ=1),Elastodynamic(dim=2,λ=1,μ=1,ρ=1,ω=1))
-    op = operators[1]
-    p  = qorder[1]
+    operators = (Elastodynamic(dim=2,λ=1,μ=1,ρ=1,ω=1),)
     for op in operators
         # construct interior solution
         c    = rand(dim)

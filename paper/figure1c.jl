@@ -11,7 +11,7 @@ function fig_gen()
     qorder    = (2,3,4)
     h0        = 1.0
     niter     = 6
-    operators = (Laplace(dim=2),Helmholtz(dim=2,k=2π))
+    operators = (Helmholtz(dim=2,k=1),)
     for op in operators
         # construct interior solution
         xout = (3,3)
@@ -24,14 +24,11 @@ function fig_gen()
             dof         = []
             for _ in 1:niter
                 quadgen!(Γ,(p,),algo1d=gausslegendre)
-                ADL  = AdjointDoubleLayerOperator(op,Γ)
-                H    = HyperSingularOperator(op,Γ)
-                δADL = GreensCorrection(ADL)
-                δH = GreensCorrection(H)
+                ADL,H = adjointdoublelayer_hypersingular(op,Γ)
                 # test interior Green identity
                 γ₀u       = γ₀(u,Γ)
                 γ₁u       = γ₁(dudn,Γ)
-                ee = error_interior_derivative_green_identity(ADL+δADL,H+δH,γ₀u,γ₁u)
+                ee = error_interior_derivative_green_identity(ADL,H,γ₀u,γ₁u)
                 push!(ee_interior,norm(ee,Inf)/norm(γ₀u,Inf))
                 push!(dof,length(Γ))
                 @show length(Γ)

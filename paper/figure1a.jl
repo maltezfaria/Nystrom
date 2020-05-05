@@ -10,9 +10,8 @@ function fig_gen()
     fig       = plot(yscale=:log10,xscale=:log10,xlabel="#dof",ylabel="error")
     qorder    = (2,3,4)
     h0        = 1.0
-    niter     = 8
-    operators = (Laplace(dim=2),Helmholtz(dim=2,k=2π))
-    # operators = (Helmholtz(dim=dim,k=1),)
+    niter     = 6
+    operators = (Helmholtz(dim=dim,k=1),)
     for op in operators
         # construct interior solution
         xout = (3,3)
@@ -26,14 +25,11 @@ function fig_gen()
             dof         = []
             for _ in 1:niter
                 quadgen!(Γ,p;algo1d=gausslegendre)
-                S  = SingleLayerOperator(op,Γ)
-                D  = DoubleLayerOperator(op,Γ)
-                δS = GreensCorrection(S)
-                δD = GreensCorrection(D)
+                S,D = Nystrom.single_double_layer(op,Γ)
                 # test interior Green identity
                 γ₀u       = γ₀(u,Γ)
                 γ₁u       = γ₁(dudn,Γ)
-                ee = error_interior_green_identity(S+δS,D+δD,γ₀u,γ₁u)
+                ee = error_interior_green_identity(S,D,γ₀u,γ₁u)
                 push!(ee_interior,norm(ee,Inf)/norm(γ₀u,Inf))
                 @show length(Γ)
                 push!(dof,length(Γ))

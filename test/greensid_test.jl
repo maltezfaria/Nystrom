@@ -26,6 +26,7 @@ using SafeTestsets
         # Nystrom._prune_interaction_list!(list,X,Y)
         S    = SingleLayerOperator(op,quad)
         dS   = GreensCorrection(S)
+        dS   = GreensCorrection(S)
         D    = DoubleLayerOperator(op,quad)
 
         # x    = SurfaceDensity(ComplexF64,quad)
