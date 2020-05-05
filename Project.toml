@@ -15,6 +15,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LinearMaps = "7a12625a-238d-50fd-b39a-03d52299707e"
 RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 Suppressor = "fd094767-a336-5f1f-9728-57cf17d0bbfb"
 

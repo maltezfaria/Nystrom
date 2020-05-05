@@ -9,6 +9,7 @@ using DoubleFloats
 using Suppressor
 using FastGaussQuadrature
 using IterativeSolvers
+using SparseArrays
 
 import ForwardDiff # used for computing jacobian
 
@@ -59,8 +60,11 @@ export
     DoubleLayerOperator,
     AdjointDoubleLayerOperator,
     HyperSingularOperator,
+    single_double_layer,
+    adjointdoublelayer_hypersingular,
     # corrections to integral operators
-    GreensCorrection
+    GreensCorrection,
+    LazyGreensCorrection
 
 
 ################################################################################
@@ -98,7 +102,8 @@ include("Potentials/potentials.jl")
 ## OPERATORS
 ################################################################################
 include("Operators/integraloperators.jl")
-include("Operators/corrections.jl")
+# include("Operators/corrections.jl")
+include("Operators/greencorrection.jl")
 include("Operators/assemble.jl")
 ################################################################################
 ## UTILS
