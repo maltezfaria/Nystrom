@@ -10,6 +10,7 @@ using Suppressor
 using FastGaussQuadrature
 using IterativeSolvers
 using SparseArrays
+using GSL
 
 import ForwardDiff # used for computing jacobian
 
@@ -61,15 +62,17 @@ export
     AdjointDoubleLayerOperator,
     HyperSingularOperator,
     single_double_layer,
+    singlelayer,
+    doublelayer,
     adjointdoublelayer_hypersingular,
     # corrections to integral operators
-    GreensCorrection,
-    LazyGreensCorrection
+    GreensCorrection
 
 
 ################################################################################
 ## GEOMETRY
 ################################################################################
+include("Geometry/point.jl")
 include("Geometry/cuboid.jl")
 include("Geometry/parametricsurface.jl")
 include("Geometry/parametricbody.jl")
@@ -90,7 +93,7 @@ include("Kernel/laplace.jl")
 include("Kernel/helmholtz.jl")
 include("Kernel/elastostatic.jl")
 include("Kernel/elastodynamic.jl")
-# include("Kernel/stokes.jl")
+include("Kernel/stokes.jl")
 # include("Kernel/maxwell.jl")
 
 ################################################################################
@@ -102,8 +105,7 @@ include("Potentials/potentials.jl")
 ## OPERATORS
 ################################################################################
 include("Operators/integraloperators.jl")
-# include("Operators/corrections.jl")
-include("Operators/greencorrection.jl")
+include("Operators/greenscorrection.jl")
 include("Operators/assemble.jl")
 ################################################################################
 ## UTILS
@@ -112,6 +114,7 @@ include("Utils/testutils.jl")
 include("Utils/geometryutils.jl")
 include("Utils/math.jl")
 include("Utils/conversions.jl")
+include("Utils/exactsolutions.jl")
 # include("Utils/utils.jl")
 
 

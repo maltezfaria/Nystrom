@@ -43,3 +43,5 @@ SingleLayerOperator(op::AbstractPDE,X,Y=X)        = IntegralOperator(SingleLayer
 DoubleLayerOperator(op::AbstractPDE,X,Y=X)        = IntegralOperator(DoubleLayerKernel(op),X,Y)
 AdjointDoubleLayerOperator(op::AbstractPDE,X,Y=X) = IntegralOperator(AdjointDoubleLayerKernel(op),X,Y)
 HyperSingularOperator(op::AbstractPDE,X,Y=X)      = IntegralOperator(HyperSingularKernel(op),X,Y)
+
+

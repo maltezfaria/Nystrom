@@ -7,7 +7,7 @@ function fig_gen()
     geo = circle()
     push!(Γ,geo)
 
-    fig       = plot(yscale=:log10,xscale=:log10,xlabel="#dof",ylabel="error")
+    fig       = plot(yscale=:log10,xscale=:log10,xlabel="N",ylabel="error")
     qorder    = (2,3,4)
     h0        = 1.0
     niter     = 6
@@ -34,9 +34,9 @@ function fig_gen()
                 @show length(Γ)
                 refine!(Γ)
             end
-            plot!(fig,dof,ee_interior,label=Nystrom.getname(op)*": p=$p",m=:o)
+            plot!(fig,dof,ee_interior,label=Nystrom.getname(op)*": p=$p",m=:o,color=conv_order)
             plot!(fig,dof,1 ./(dof.^conv_order)*dof[end]^(conv_order)*ee_interior[end],
-                  label="",linewidth=4)
+                  label="",linewidth=4,line=:dot,color=conv_order)
         end
     end
     return fig

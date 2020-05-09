@@ -42,9 +42,9 @@ function sphere_sources(;nsources, radius=5, center=[0 0 0])
     Xs = Point{3,Float64}[]
     for n in 1:nsources
             θ,φ = rand()*2π, rand()*π
-            x = center[1] + r*sin(φ)*cos(θ)
-            y = center[2] + r*sin(φ)*sin(θ)
-            z = center[3] + r*cos(φ)
+            x = center[1] + radius*sin(φ)*cos(θ)
+            y = center[2] + radius*sin(φ)*sin(θ)
+            z = center[3] + radius*cos(φ)
             pt = Point(x,y,z)
             push!(Xs, pt)
     end

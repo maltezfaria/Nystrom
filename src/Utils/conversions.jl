@@ -11,7 +11,7 @@ function Base.Matrix(A::Array{Mat{M,N,T,L},2})  where {M,N,T,L}
     return Afull
 end
 
-function matrix_to_tensor(T,A::Matrix)
+function matrix_to_blockmatrix(T,A::Matrix)
     sblock = size(T)
     nblock = div.(size(A),sblock)
     Ablock = Matrix{T}(undef,nblock)

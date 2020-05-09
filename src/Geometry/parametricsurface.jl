@@ -113,7 +113,7 @@ end
 """
 function meshgen!(surf::ParametricSurface{M},h) where {M}
     domain = surf.domain
-    n      = ceil.(Int,(domain.high_corner-domain.low_corner) / h)
+    n      = ceil.(Int,(domain.high_corner-domain.low_corner)/h)
     elements = surf.elements
     resize!(elements,prod(n))
     if M == 1

@@ -11,7 +11,6 @@ function fig_gen()
     qorder    = (2,3,4)
     h0        = 2.0
     niter     = 4
-    # operators = (Laplace(dim=dim),Helmholtz(dim=dim,k=2π))
     operators = (Helmholtz(dim=dim,k=1),)
     for op in operators
         # construct interior solution
@@ -25,23 +24,20 @@ function fig_gen()
             dof         = []
             for _ in 1:niter
                 quadgen!(Γ,p,algo1d=gausslegendre)
-                S  = SingleLayerOperator(op,Γ)
-                D  = DoubleLayerOperator(op,Γ)
-                δS = GreensCorrection(S)
-                δD = GreensCorrection(D)
+                S,D = single_double_layer(op,Γ)
                 # test interior Green identity
                 γ₀u       = γ₀(u,Γ)
                 γ₁u       = γ₁(dudn,Γ)
-                ee = error_interior_green_identity(S+δS,D+δD,γ₀u,γ₁u)
+                ee = error_interior_green_identity(S,D,γ₀u,γ₁u)
                 push!(ee_interior,norm(ee,Inf)/norm(γ₀u,Inf))
                 @show length(Γ)
                 push!(dof,length(Γ))
                 refine!(Γ)
             end
             dof = sqrt.(dof) # roughly the inverse of the mesh size
-            plot!(fig,dof,ee_interior,label=Nystrom.getname(op)*": p=$p",m=:o)
+            plot!(fig,dof,ee_interior,label=Nystrom.getname(op)*": p=$p",m=:o,color=conv_order)
             plot!(fig,dof,1 ./(dof.^conv_order)*dof[end]^(conv_order)*ee_interior[end],
-                  label="",linewidth=4)
+                  label="",linewidth=4,line=:dot,color=conv_order)
         end
     end
     return fig
