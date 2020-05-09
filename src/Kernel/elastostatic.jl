@@ -1,7 +1,6 @@
 ################################################################################
 ## ELASTOSTATIC
 ################################################################################
-
 struct Elastostatic{N,T} <: AbstractPDE{N}
     μ::T
     λ::T
@@ -26,7 +25,8 @@ function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:Elastostatic}
     RRT = r*transpose(r) # r ⊗ rᵗ
     if N==2
         ID = Mat{2,2,Float64,4}(1,0,0,1)
-        return 1/(8π*μ*(1-ν))*(-(3-4*ν)*log(d)*ID + RRT/d^2)
+        # return 1/(8π*μ*(1-ν))*(-(3-4*ν)*log(d)*ID + RRT/d^2)
+        return (λ + 3μ)/(4*π*(N-1)*μ*(λ+2μ))* (-log(d)*ID + (λ+μ)/(λ+3μ)*RRT/d^2)
     elseif N==3
         ID = Mat{3,3,Float64,9}(1,0,0,0,1,0,0,0,1)
         return 1/(16π*μ*(1-ν)*d)*((3-4*ν)*ID + RRT/d^2)
@@ -44,9 +44,11 @@ function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:Elastostatic}
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
     drdn = dot(r,ny)/d
+    dγdny = 1/d*drdn
     if N==2
         ID = Mat{2,2,Float64,4}(1,0,0,1)
-        return -1/(4π*(1-ν)*d)*(drdn*((1-2ν)*ID + 2*RRT/d^2) - (1-2ν)/d*(r*transpose(ny) - ny*transpose(r)))
+        # return -1/(4π*(1-ν)*d)*(drdn*((1-2ν)*ID + 2*RRT/d^2) - (1-2ν)/d*(r*transpose(ny) - ny*transpose(r)))
+        return μ/(2*(N-1)*π*(λ+2μ))*( (ID + N*(λ+μ)/(μ*d^2)*RRT)*dγdny - 1/d^N*(r*transpose(ny)-ny*transpose(r)) ) 
     elseif N==3
         ID = Mat{3,3,Float64,9}(1,0,0,0,1,0,0,0,1)
         return -1/(8π*(1-ν)*d^2)*(drdn * ((1-2*ν)*ID + 3*RRT/d^2) - (1-2*ν)/d*(r*transpose(ny) - ny*transpose(r)))
