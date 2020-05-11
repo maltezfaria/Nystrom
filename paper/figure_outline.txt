@@ -1,8 +1,8 @@
-Figure 1 --> Greens identities in 2d
-       1a --> Laplace + Helmholtz
-       1b --> Elastostatic + Elastodynamics
-       1c --> Derivative of Laplace + Helmholtz
-       1d --> Derivative of Elastostatic + Elastodynamics
+Figure 1 --> Greens identities 
+       1a --> Helmholtz + Elastodynamic in 2d
+       1b --> Derivative of Helmholtz + Elastodynamic in 2d
+       1c --> Helmholtz + Elastodynamic in 3d
+       1d --> Derivative of Helmholtz + Elastodynamic in 3d
 
 Figure 2 --> Greens identities in 3d
        2a --> Laplace + Helmholtz
