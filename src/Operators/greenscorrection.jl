@@ -145,7 +145,7 @@ function precompute_weights_pinv(c::GreensCorrection,S=Float64)
     iop  = c.iop
     a,b  = combined_field_coefficients(iop.kernel)
     X,Y   = iop.X, iop.Y
-    Linv  = [invert_green_matrix(Matrix(L)) for L in c.L]
+    Linv  = [invert_green_matrix(Matrix(L),S) for L in c.L]
     for i in 1:size(c,1)
         idx_el    = c.idxel_near[i]
         idx_el < 0 && continue
