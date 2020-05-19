@@ -111,19 +111,17 @@ function GreensCorrection(iop::IntegralOperator,compress=Matrix)
     GreensCorrection(iop,Op1,Op2)
 end
 
-
 ################################################################################
 ################################################################################
 ################################################################################
-function precompute_weights_qr(c::GreensCorrection,S=Float64)
-    T = eltype(c)
+# FIXME:this function needs to be cleaned up and optimized for perf
+function precompute_weights_qr(c::GreensCorrection{T}) where {T<:Number}
     w = [Vector{T}() for _ in 1:size(c,1)]
     iop  = c.iop
     a,b  = combined_field_coefficients(iop.kernel)
     X,Y  = iop.X, iop.Y
-    QRType = Base.promote_op(qr,Matrix{eltype(c)})
+    QRType = Base.promote_op(qr,Matrix{T})
     LQR  = Vector{QRType}(undef,length(c.L))
-    # LQR  = [qr(Matrix(L)) for L in c.L]
     for i in 1:size(c,1)
         idx_el    = c.idxel_near[i]
         idx_el < 0 && continue
@@ -133,11 +131,34 @@ function precompute_weights_qr(c::GreensCorrection,S=Float64)
             LQR[idx_el] = qr(c.L[idx_el])
         end
         F       = LQR[idx_el]
-        tmp     = (Matrix(c.R[i:i,:])*pinv(F.R))*adjoint(F.Q)
-        if T <: Mat
-            tmp  = matrix_to_blockmatrix(T,tmp)
-        end
+        tmp     = (c.R[i:i,:]*pinv(F.R))*adjoint(F.Q)
         w[i]     = @views a*tmp[1:ninterp] + b*tmp[ninterp+1:end]
+    end
+    return w
+end
+
+# Tensor case. We need to convert the *matrix of matrices* structures to flat
+# matrices for doing qr, then convert back. Not very efficient... but may be not
+# very important?
+function precompute_weights_qr(c::GreensCorrection{T}) where {T<:Mat}
+    w   = [Vector{T}() for _ in 1:size(c,1)]
+    iop = c.iop
+    a,b = combined_field_coefficients(iop.kernel)
+    X,Y = iop.X, iop.Y
+    QRType = Base.promote_op(qr,Matrix{eltype(T)})
+    LQR    = Vector{QRType}(undef,length(c.L))
+    for i in 1:size(c,1)
+        idx_el    = c.idxel_near[i]
+        idx_el < 0 && continue
+        idx_nodes = getelements(iop.Y)[idx_el]
+        ninterp = length(idx_nodes)
+        if !isassigned(LQR,idx_el)
+            LQR[idx_el] = qr(Matrix(c.L[idx_el]))
+        end
+        F    = LQR[idx_el]
+        tmp  = (Matrix(c.R[i:i,:])*pinv(F.R))*adjoint(F.Q)
+        tmp2 = matrix_to_blockmatrix(T,tmp)
+        w[i] = @views a*tmp2[1:ninterp] + b*tmp2[ninterp+1:end]
     end
     return w
 end
