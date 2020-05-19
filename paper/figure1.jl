@@ -6,7 +6,8 @@ function convergence_interior_greens_identity(op,dim,qorder,h,niter;derivative=f
     geo = dim == 2 ? Circle() : Sphere()
     # push!(Γ,geo)
     # figs      = []
-    fig       = plot(yscale=:log10,xscale=:log10,xlabel="N",ylabel="error",legend=:bottomleft)
+    fig       = plot(yscale=:log10,xscale=:log10,
+                     xlabel= dim==2 ? "N" : "√N",ylabel="error",legend=:bottomleft)
     cc = 1
     colors = [:red,:green,:blue,:yellow,:black,:pink]
     # construct interior solution
