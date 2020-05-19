@@ -58,7 +58,7 @@ function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:Elastodynamic}
     r = x .- y
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
-    drdn = dot(r,ny)/d
+    drdn = -dot(r,ny)/d
     s = -im*ω
     z1 = s*d/c1
     z2 = s*d/c2
@@ -86,59 +86,16 @@ function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:Elastodynamic}
         ψr   = -chi/d - (1+z2)*exp(-z2)/d^2
         chir = -3chi/d - (1+z2)*exp(-z2)/d^2 + c2^2/c1^2*(1+z1)*exp(-z1)/d^2
     end
-    return 1/(α*π) * ( (ψr - chi/d) * (drdn*ID + ny*transpose(r)/d) -
-                      2*chi/d*(r*transpose(ny)/d - 2*drdn*RRT/d^2) - 2*chir*drdn*RRT/d^2 +
-                      (c1^2/c2^2 -2)*(ψr - chir - α/2*chi/d)*r*transpose(ny)/d
+    return 1/(α*π) * ( (ψr - chi/d) * (drdn*ID - ny*transpose(r)/d) -
+                      2*chi/d*(-r*transpose(ny)/d - 2*drdn*RRT/d^2) - 2*chir*drdn*RRT/d^2 +
+                      (c1^2/c2^2 -2)*(ψr - chir - α/2*chi/d)*(-r)*transpose(ny)/d
                     )
 end
 
 # Adjoint Double Layer Kernel
 function (ADL::AdjointDoubleLayerKernel{T,S})(x,y,nx)::T where {T,S<:Elastodynamic}
-    N = ambient_dim(S)
-    x==y && return zero(T)
-    μ = ADL.op.μ
-    λ = ADL.op.λ
-    ω = ADL.op.ω
-    ρ = ADL.op.ρ
-    c1 = sqrt((λ + 2μ)/ρ)
-    c2 = sqrt(μ/ρ)
-    r = x .- y
-    d = norm(r)
-    RRT = r*transpose(r) # r ⊗ rᵗ
-    RNXT = r*transpose(nx)
-    NXRT = nx*transpose(r)
-    drdn = dot(r,nx)/d
-    s = -im*ω
-    z1 = s*d/c1
-    z2 = s*d/c2
-    if N==2
-        ID = Mat{2,2,Float64,4}(1,0,0,1)
-        α = 2
-        ##
-        ψ = (-c2/c1 * besselk(1,z1) + besselk(1,z2))/z2 + besselk(0,z2)
-        ##
-        ψr = 1/(d*z2)* (c2/c1 * (besselk(0,z1)*z1 + 2*besselk(1,z1)) -
-                        (besselk(0,z2)*z2 + 2*besselk(1,z2)) -
-                        besselk(1,z2)*z2^2
-                        )
-        ##
-        chi = -(c2/c1)^2*(besselk(0,z1) + 2/z1*besselk(1,z1)) + besselk(0,z2) + 2/z2*besselk(1,z2)
-        ##
-        chir = 1/d*( c2^2/c1^2*(besselk(1,z1)*z1 + 2*(besselk(0,z1) + 2/z1*besselk(1,z1))) -
-                   (besselk(1,z2)*z2 + 2*(besselk(0,z2) + 2/z2*besselk(1,z2)))
-                  )
-    elseif N==3
-        α = 4
-        ID = Mat{3,3,Float64,9}(1,0,0,0,1,0,0,0,1)
-        ψ    = exp(-z2)/d + (1+z2)/(z2^2)*exp(-z2)/d - c2^2/c1^2*(1+z1)/(z1^2)*exp(-z1)/d
-        chi  = 3*ψ - 2*exp(-z2)/d - c2^2/c1^2*exp(-z1)/d
-        ψr   = -chi/d - (1+z2)*exp(-z2)/d^2
-        chir = -3chi/d - (1+z2)*exp(-z2)/d^2 + c2^2/c1^2*(1+z1)*exp(-z1)/d^2
-    end
-    return 1/(α*π) * ( 2*(chir - 2*chi/d)*dot(nx,r)*RRT/d^3 + 2*chi/d^2*NXRT -
-                       (ψr - chi/d)*(dot(r,nx)*ID/d + RNXT/d)  -
-                       λ/μ*( ψr - chir - α/2*chi/d)*NXRT/d
-                       )
+    DL = DoubleLayerKernel{T}(ADL.op)
+    return -DL(x,y,nx) |> transpose
 end
 
 # Hypersingular kernel

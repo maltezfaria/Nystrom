@@ -25,8 +25,8 @@ function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:Elastostatic}
     RRT = r*transpose(r) # r ⊗ rᵗ
     if N==2
         ID = Mat{2,2,Float64,4}(1,0,0,1)
-        # return 1/(8π*μ*(1-ν))*(-(3-4*ν)*log(d)*ID + RRT/d^2)
-        return (λ + 3μ)/(4*π*(N-1)*μ*(λ+2μ))* (-log(d)*ID + (λ+μ)/(λ+3μ)*RRT/d^2)
+        return 1/(8π*μ*(1-ν))*(-(3-4*ν)*log(d)*ID + RRT/d^2)
+        # return (λ + 3μ)/(4*π*(N-1)*μ*(λ+2μ))* (-log(d)*ID + (λ+μ)/(λ+3μ)*RRT/d^2)
     elseif N==3
         ID = Mat{3,3,Float64,9}(1,0,0,0,1,0,0,0,1)
         return 1/(16π*μ*(1-ν)*d)*((3-4*ν)*ID + RRT/d^2)
@@ -43,35 +43,37 @@ function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:Elastostatic}
     r = x .- y
     d = norm(r)
     RRT = r*transpose(r) # r ⊗ rᵗ
-    drdn = dot(r,ny)/d
+    drdn = -dot(r,ny)/d
     dγdny = 1/d*drdn
     if N==2
         ID = Mat{2,2,Float64,4}(1,0,0,1)
-        # return -1/(4π*(1-ν)*d)*(drdn*((1-2ν)*ID + 2*RRT/d^2) - (1-2ν)/d*(r*transpose(ny) - ny*transpose(r)))
-        return μ/(2*(N-1)*π*(λ+2μ))*( (ID + N*(λ+μ)/(μ*d^2)*RRT)*dγdny - 1/d^N*(r*transpose(ny)-ny*transpose(r)) ) 
+        return -1/(4π*(1-ν)*d)*(drdn*((1-2ν)*ID + 2*RRT/d^2) + (1-2ν)/d*(r*transpose(ny) - ny*transpose(r)))
+        # return μ/(2*(N-1)*π*(λ+2μ))*( (ID + N*(λ+μ)/(μ*d^2)*RRT)*dγdny - 1/d^N*(r*transpose(ny)-ny*transpose(r)) )
     elseif N==3
         ID = Mat{3,3,Float64,9}(1,0,0,0,1,0,0,0,1)
-        return -1/(8π*(1-ν)*d^2)*(drdn * ((1-2*ν)*ID + 3*RRT/d^2) - (1-2*ν)/d*(r*transpose(ny) - ny*transpose(r)))
+        return -1/(8π*(1-ν)*d^2)*(drdn * ((1-2*ν)*ID + 3*RRT/d^2) + (1-2*ν)/d*(r*transpose(ny) - ny*transpose(r)))
     end
 end
 
 # Adjoint Double Layer Kernel
 function (ADL::AdjointDoubleLayerKernel{T,S})(x,y,nx)::T where {T,S<:Elastostatic}
-    N = ambient_dim(S)
-    x==y && return zero(T)
-    μ = ADL.op.μ
-    λ = ADL.op.λ
-    ν = λ/(2*(μ+λ))
-    r = x .- y
-    d = norm(r)
-    RRT = r*transpose(r) # r ⊗ rᵗ
-    if N==2
-        ID = Mat{2,2,Float64,4}(1,0,0,1)
-        return 1/(4π*(1-ν)*d)*((1-2ν)/d*(-nx*transpose(r) + dot(r,nx)*ID + r*transpose(nx)) + 2/d^3*dot(r,nx)*RRT)
-    elseif N==3
-        ID = Mat{3,3,Float64,9}(1,0,0,0,1,0,0,0,1)
-        return 1/(8π*(1-ν)*d^2)*((1-2ν)/d*(-nx*transpose(r) + dot(r,nx)*ID + r*transpose(nx)) + 3/d^3*dot(r,nx)*RRT)
-    end
+    DL = DoubleLayerKernel{T}(ADL.op)
+    return -DL(x,y,nx) |> transpose
+    # N = ambient_dim(S)
+    # x==y && return zero(T)
+    # μ = ADL.op.μ
+    # λ = ADL.op.λ
+    # ν = λ/(2*(μ+λ))
+    # r = x .- y
+    # d = norm(r)
+    # RRT = r*transpose(r) # r ⊗ rᵗ
+    # if N==2
+    #     ID = Mat{2,2,Float64,4}(1,0,0,1)
+    #     return 1/(4π*(1-ν)*d)*((1-2ν)/d*(nx*transpose(r) + dot(r,nx)*ID - r*transpose(nx)) + 2/d^3*dot(r,nx)*RRT)
+    # elseif N==3
+    #     ID = Mat{3,3,Float64,9}(1,0,0,0,1,0,0,0,1)
+    #     return 1/(8π*(1-ν)*d^2)*((1-2ν)/d*(-nx*transpose(r) + dot(r,nx)*ID + r*transpose(nx)) + 3/d^3*dot(r,nx)*RRT)
+    # end
 end
 
 # Hypersingular kernel
