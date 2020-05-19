@@ -44,4 +44,4 @@ DoubleLayerOperator(op::AbstractPDE,X,Y=X)        = IntegralOperator(DoubleLayer
 AdjointDoubleLayerOperator(op::AbstractPDE,X,Y=X) = IntegralOperator(AdjointDoubleLayerKernel(op),X,Y)
 HyperSingularOperator(op::AbstractPDE,X,Y=X)      = IntegralOperator(HyperSingularKernel(op),X,Y)
 
-
+ambient_dim(iop::IntegralOperator) = ambient_dim(iop.kernel)

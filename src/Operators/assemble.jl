@@ -1,22 +1,20 @@
 function single_double_layer(pde,X,Y=X;compress=Matrix,correction=:greenscorrection)
     Sop  = SingleLayerOperator(pde,X,Y)
     Dop  = DoubleLayerOperator(pde,X,Y)
-    # convert to a possibly more efficient compress
+    # convert to a possibly more efficient format
     S = compress(Sop)
     D = compress(Dop)
     if correction == :greenscorrection
         # compute corrections
         δS = GreensCorrection(Sop,S,D)
         δD = GreensCorrection(Dop,δS.R,δS.L,δS.idxel_near) # reuse precomputed quantities of δS 
-        return S+δS, D+δD
+        return S+sparse(δS), D+sparse(δD)
     elseif correction == :nothing
         return S,D
     end
 end
-
 singlelayer(args...;kwargs...) = single_double_layer(args...;kwargs...)[1]
 doublelayer(args...;kwargs...) = single_double_layer(args...;kwargs...)[2]
-
 
 function adjointdoublelayer_hypersingular(pde,X,Y=X;compress=Matrix,correction=:greenscorrection)
     ADop  = AdjointDoubleLayerOperator(pde,X,Y)
@@ -28,7 +26,7 @@ function adjointdoublelayer_hypersingular(pde,X,Y=X;compress=Matrix,correction=:
         # compute corrections
         δAD = GreensCorrection(ADop,AD,H)
         δH  = GreensCorrection(Hop,δAD.R,δAD.L,δAD.idxel_near) # reuse precomputed quantities of δAD
-        return AD+δAD, H+δH
+        return AD+sparse(δAD), H+sparse(δH)
     elseif correction == :nothing
         return AD,H
     end

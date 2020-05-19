@@ -4,35 +4,15 @@ using GeometryTypes: Point, Normal, Mat
 using LinearAlgebra
 using SpecialFunctions
 using RecipesBase
-using GmshTools
 using DoubleFloats
 using Suppressor
-using FastGaussQuadrature
 using IterativeSolvers
 using SparseArrays
 using GSL
-
-import ForwardDiff # used for computing jacobian
+using GmshTools
+using Printf
 
 export
-    # geometry
-    ellipsis,
-    circle,
-    kite,
-    cube,
-    sphere,
-    ellipsoid,
-    bean,
-    refine!,
-    domain,
-    quadgen!,
-    meshgen!,
-    tensorquadrature,
-    gmshquadrature,
-    Domain,
-    getnodes,
-    getnormals,
-    getweights,
     # operators
     Laplace,
     Helmholtz,
@@ -66,24 +46,13 @@ export
     doublelayer,
     adjointdoublelayer_hypersingular,
     # corrections to integral operators
-    GreensCorrection
+    GreensCorrection,
+    # quadrature
+    quadgengmsh
 
+include("interface.jl")
 
-################################################################################
-## GEOMETRY
-################################################################################
-include("Geometry/point.jl")
-include("Geometry/cuboid.jl")
-include("Geometry/parametricsurface.jl")
-include("Geometry/parametricbody.jl")
-include("Geometry/parametricshapes.jl")
-include("Geometry/quadrature.jl")
-include("Geometry/domain.jl")
-
-################################################################################
-## QUADRATURE
-################################################################################
-# include("Quadrature/quadrature.jl")
+include("gmshquadrature.jl")
 
 ################################################################################
 ## KERNEL
@@ -107,6 +76,7 @@ include("Potentials/potentials.jl")
 include("Operators/integraloperators.jl")
 include("Operators/greenscorrection.jl")
 include("Operators/assemble.jl")
+
 ################################################################################
 ## UTILS
 ################################################################################
@@ -115,6 +85,7 @@ include("Utils/geometryutils.jl")
 include("Utils/math.jl")
 include("Utils/conversions.jl")
 include("Utils/exactsolutions.jl")
+include("Utils/gmshaddons.jl")
 # include("Utils/utils.jl")
 
 

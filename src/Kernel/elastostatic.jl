@@ -10,8 +10,8 @@ Elastostatic{N}(μ::T,λ::T) where {N,T} = Elastostatic{N,T}(μ,λ)
 
 getname(::Elastostatic) = "Elastostatic"
 
-default_kernel_type(::Elastostatic{N}) where {N} = Mat{N,N,Float64,N*N}
-default_density_type(::Elastostatic{N}) where {N} = Vec{N,Float64}
+default_kernel_eltype(::Elastostatic{N}) where {N} = Mat{N,N,Float64,N*N}
+default_density_eltype(::Elastostatic{N}) where {N} = Vec{N,Float64}
 
 # Single Layer
 function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:Elastostatic}

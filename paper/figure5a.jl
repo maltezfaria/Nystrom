@@ -1,66 +1,86 @@
-using Nystrom, Test, Logging, GeometryTypes, LinearAlgebra, Plots, gmsh, LaTeXStrings, LinearMaps
-using Nystrom: SingleLayerKernel, DoubleLayerKernel, Laplace, Stokes, quadgen, SingleLayerPotential, DoubleLayerPotential,
-    Helmholtz, Stokes, Maxwell, SingleLayerOperator, DoubleLayerOperator, IOpCorrection, AdjointDoubleLayerKernel,
-    HypersingularKernel, AdjointDoubleLayerOperator, HypersingularOperator
+using Nystrom, FastGaussQuadrature, Plots, LinearAlgebra, IterativeSolvers, Clusters, HMatrices, SparseArrays, LinearMaps, GmshTools
+using Nystrom: sphere_helmholtz_soundsoft, Point, @gmsh
 
-function compute_error(op,quad,r0)
-    dim = 2
-    npts        = length(quad.nodes)
-    nodes_per_element = quad.nodes_per_element
-    nsources    = 3*quad.nodes_per_element
-    SL_kernel   = SingleLayerKernel{dim}(op)
-    DL_kernel   = DoubleLayerKernel{dim}(op)
-    SL_op       = SingleLayerOperator(SL_kernel,quad)
-    DL_op       = DoubleLayerOperator(DL_kernel,quad)
-    SL_matrix   = Matrix(SL_op)
-    DL_matrix   = Matrix(DL_op)
-    # exact solution as linear combination of rows of Greens tensor
-    xₛ          = 3*ones(Point{dim})
-    # trace of exact solution
-    T           = eltype(SL_kernel)
-    T <: Number ? c = ones() : c = ones(size(T)[1])
-    γ₀U         = [transpose(SL_kernel(xₛ,y))*c   for  y in quad.nodes]
-    γ₁U         = [transpose(DL_kernel(xₛ,y,ny))*c for  (y,ny) in zip(quad.nodes,quad.normals)];
+const mesh = gmsh.model.mesh
 
-    ee     = Float64[]
-    for r in r0
-        sources     = Nystrom.circle_sources(nsources,r)
-        SLDL_corr        = IOpCorrection(SL_op,SL_matrix,DL_matrix,sources);
-        SL1(u)      = SL_matrix*u  - SLDL_corr(u,0,-1)
-        DL1(u)      = DL_matrix*u  - SLDL_corr(u,1,0)
-        # error in trace
-        L = LinearMap(u -> u/2 + DL1(u),npts)
-        rhs = SL1(γ₁U)
-        du,ch = gmres(L,rhs,verbose=false,log=true,tol=1e-14)
-        er1 = γ₀U - du
-        push!(ee,norm(er1,Inf)/norm(γ₀U,Inf))
-        println("Greens identity error:")
-        println("$op $dim $(norm(er1,Inf))")
-        println("niter $(ch.iters)")
-        println("r0 $(r0)")
-    end
-    return ee
+function compute_approx_solution(meshsurface,meshoutput,k,p)
+    pde = Helmholtz(dim=3,k=k)
+    ui       = (x) -> exp(im*k*x[1])
+    # get
+    gmsh.open(meshsurface)
+    surface_tags,surface_coords,_ = gmsh.model.mesh.getNodes()
+    surface_pts                   = reinterpret(Point{3,Float64},surface_coords) |> collect |> vec
+    # generate a quadrature
+    dimtags    = gmsh.model.getEntities(2)
+    Γ          = quadgengmsh("Gauss$p",dimtags)
+    @info "starting computation with $(length(Γ.nodes)) quadrature points..."
+    @info "building the cluster trees."
+    spl  = GeometricMinimalSplitter(nmax=128)
+    clt  = ClusterTree(Γ.nodes,spl)
+    bclt = BlockTree(clt,clt)
+    permute!(Γ,clt.perm)
+    atol = 1e-6
+    aca  = HMatrices.PartialACA(atol=atol)
+    tsvd = HMatrices.TSVD(atol=atol)
+    compress = (x) -> HMatrix(x,bclt,(x...) -> aca(x...))
+    @info "done."
+    @info "Assembling matrices..."
+    S,D   = single_double_layer(pde,Γ;compress=compress)
+    @info "\t compression rate: S --> $(HMatrices.compression_rate(S)), D --> $(HMatrices.compression_rate(D)),"
+    @info "done..."
+    @info "solving by gmres..."
+    γ₀U   = γ₀(y-> -ui(y),Γ)
+    L     = LinearMap(σ -> σ/2 + D*σ - im*k*(S*σ),length(γ₀U))
+    σ,ch  = gmres(L,γ₀U,verbose=false,log=true,tol=1e-6,restart=100,maxiter=100)
+    @info "done. gmres converged in $(ch.iters) iterations."
+    gmsh.open(meshoutput)
+    output_tags,output_coords,_ = gmsh.model.mesh.getNodes()
+    output_pts                  = reinterpret(Point{3,Float64},output_coords) |> collect |> vec
+    @info "Evaluating field error at $(length(output_pts)) observation points"
+    spl  = GeometricMinimalSplitter(nmax=128)
+    Xclt = ClusterTree(output_pts,spl,reorder=true)
+    bclt = BlockTree(Xclt,clt)
+    compress = (x) -> HMatrix(x,bclt,HMatrices.PartialACA(atol=atol))
+    S,D  = single_double_layer(pde,output_pts,Γ;compress=compress,correction=:greenscorrection)
+    isoutside = [norm(x) >= 1 ? 1 : 0 for x in output_pts]
+    Ua        = (D*σ - im*k*(S*σ)).*isoutside
+    Ui        = [ui(x) for x in output_pts].*isoutside
+    sol_real = vec([ [real(Ua[n] + Ui[n])] for n in 1:length(Ua)])
+    permute!(sol_real,invperm(Xclt.perm))
+    view_solution = gmsh.view.add("solution (real part)")
+    mname = gmsh.model.getCurrent()
+    gmsh.view.addModelData(view_solution,0,mname,"NodeData",output_tags,sol_real)
+    # write
+    fname,ext = split(meshsurface,".")
+    gmsh.view.write(view_solution, fname*"_solution."*ext)
+    return nothing
 end
 
-function fig_gen()
-    dim = 2
-    niter = 4
-    op = Helmholtz(1)
-    qorder = 5
-    Γ = Nystrom.kite()
-    for _=1:3; Nystrom.refine!(Γ); end
-    fig = plot(xlabel="r",ylabel="error")
-    rrange = 2 .^ (1:16)
-    for iter = 1:niter
-        quad = quadgen(Γ,qorder)
-        npts = length(quad.nodes)
-        ee = compute_error(op,quad,rrange)
-        plot!(fig,rrange,ee,marker=:x,label="N=$npts",xscale=:log10,yscale=:log10)
-        Nystrom.refine!(Γ)
-    end
-    return fig
-end
+gmsh.initialize()
 
-fig = fig_gen()
-fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/figures/fig5a"
-savefig(fig,fname)
+λ = 0.5
+k = 2π/λ
+p = 2
+
+meshoutput   = "xyplane.msh"
+meshsurface = "sphere_alg_6_order_1_recombine_false.msh"
+compute_approx_solution(meshsurface,meshoutput,k,p)
+meshsurface = "sphere_alg_6_order_3_recombine_false.msh"
+compute_approx_solution(meshsurface,meshoutput,k,p)
+meshsurface = "sphere_alg_6_order_1_recombine_true.msh"
+compute_approx_solution(meshsurface,meshoutput,k,p)
+meshsurface = "sphere_alg_6_order_3_recombine_true.msh"
+compute_approx_solution(meshsurface,meshoutput,k,p)
+
+gmsh.finalize()
+
+# p = 2
+# λ = 1
+# pde = Helmholtz(dim=3,k=2π/λ)
+# path = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/"
+# mesh_file = joinpath(path,"sphere_with_planes_fulltri.msh")
+# fig = fig_gen(pde,mesh_file,p)
+# mesh_file = joinpath(path,"sphere_with_planes_fullquad.msh")
+# fig = fig_gen(pde,mesh_file,p)
+# mesh_file = joinpath(path,"sphere_with_planes_hybrid.msh")
+# fig = fig_gen(pde,mesh_file,p)

@@ -7,8 +7,8 @@ Stokes{N}(μ::T) where {N,T}  = Stokes{N,T}(μ)
 
 getname(::Stokes) = "Stokes"
 
-default_kernel_type(::Stokes{N}) where {N} = Mat{N,N,Float64,N*N}
-default_density_type(::Stokes{N}) where {N} = Vec{N,Float64}
+default_kernel_eltype(::Stokes{N}) where {N} = Mat{N,N,Float64,N*N}
+default_density_eltype(::Stokes{N}) where {N} = Vec{N,Float64}
 
 # Single Layer
 function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:Stokes}

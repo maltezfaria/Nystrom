@@ -40,6 +40,7 @@ function Base.getindex(c::GreensCorrection,i::Int,j::Int)
 end
 
 function GreensCorrection(iop::IntegralOperator{T,K},Op1,Op2,basis,γ₁_basis,σ) where {T,K}
+    @assert σ == 0 || σ == -0.5
     kernel,X,Y  = iop.kernel, iop.X, iop.Y
     op          = kernel.op
     m,n         = length(X),length(Y)
@@ -92,10 +93,7 @@ function GreensCorrection(iop::IntegralOperator,Op1,Op2,xs::Vector{<:Point})
 end
 
 function GreensCorrection(iop::IntegralOperator,Op1,Op2)
-    nquad  = mapreduce(x->length(x),max,getelements(iop.Y))
-    nbasis = 3*nquad
-    # construct source basis
-    xs     = source_gen(iop.Y,nbasis)
+    xs = source_gen(iop)
     GreensCorrection(iop,Op1,Op2,xs)
 end
 
@@ -107,8 +105,8 @@ function GreensCorrection(iop::IntegralOperator,compress=Matrix)
         Op1 = IntegralOperator{T}(SingleLayerKernel(op),X,Y) |> compress
         Op2 = IntegralOperator{T}(DoubleLayerKernel(op),X,Y) |> compress
     elseif kernel_type(iop) isa Union{AdjointDoubleLayer,HyperSingular}
-        Op1 = IntegralOperator{T}(AdjointDoubleLayerKernel(op),X,Y) |> Matrix
-        Op2 = IntegralOperator{T}(HyperSingularKernel(op),X,Y) |> Matrix
+        Op1 = IntegralOperator{T}(AdjointDoubleLayerKernel(op),X,Y) |> compress
+        Op2 = IntegralOperator{T}(HyperSingularKernel(op),X,Y) |> compress
     end
     GreensCorrection(iop,Op1,Op2)
 end
@@ -123,12 +121,17 @@ function precompute_weights_qr(c::GreensCorrection,S=Float64)
     iop  = c.iop
     a,b  = combined_field_coefficients(iop.kernel)
     X,Y  = iop.X, iop.Y
-    LQR  = [qr(Matrix(L)) for L in c.L]
+    QRType = Base.promote_op(qr,Matrix{eltype(c)})
+    LQR  = Vector{QRType}(undef,length(c.L))
+    # LQR  = [qr(Matrix(L)) for L in c.L]
     for i in 1:size(c,1)
         idx_el    = c.idxel_near[i]
         idx_el < 0 && continue
         idx_nodes = getelements(iop.Y)[idx_el]
         ninterp = length(idx_nodes)
+        if !isassigned(LQR,idx_el)
+            LQR[idx_el] = qr(c.L[idx_el])
+        end
         F       = LQR[idx_el]
         tmp     = (Matrix(c.R[i:i,:])*pinv(F.R))*adjoint(F.Q)
         if T <: Mat
@@ -206,7 +209,7 @@ function SparseArrays.sparse(c::GreensCorrection)
         idx_el    = c.idxel_near[i]
         idx_el < 0 && continue
         idx_nodes = getelements(iop.Y)[idx_el]
-        append!(I,fill(i,ninterp))
+        append!(I,fill(i,length(idx_nodes)))
         append!(J,idx_nodes)
         append!(V,w[i])
     end
@@ -249,6 +252,16 @@ function nearest_element_list(X,Y; tol=0)
     xnodes = getnodes(X)
     ynodes = getnodes(Y)
     in2e   = idx_nodes_to_elements(Y)
+    # special case (which arises often for integral operators) where X==Y.
+    # No distance computation is needed then
+    if X == Y
+        for i=1:n
+            @assert length(in2e[i]) == 1
+            list[i] = in2e[i] |>  first
+        end
+    end
+    # compute the nearest element for each node FIXME: this is n^2 complexity,
+    # should do an n complexity by using e.g. a cluster tree
     for i in 1:n
         x = xnodes[i]
         d = map(j -> norm(x .- ynodes[j]),1:m)
@@ -256,6 +269,23 @@ function nearest_element_list(X,Y; tol=0)
         if dmin ≤ tol
             @assert length(in2e[idx_min]) == 1
             list[i] = in2e[idx_min] |>  first
+        end
+    end
+    return list
+end
+
+"""
+    idx_nodes_to_elements(q::Quadrature)
+
+For each node in `q`, return the indices of the elements to which it belongs.
+
+Depending on the quadrature type, more efficient methods can be defined and overloaded if needed.
+"""
+function idx_nodes_to_elements(q)
+    list = [Int[] for _ in 1:length(q)]
+    for n in 1:length(getelements(q))
+        for i in getelements(q)[n]
+            push!(list[i],n)
         end
     end
     return list

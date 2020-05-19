@@ -1,78 +1,52 @@
-using Nystrom, Test, Logging, GeometryTypes, LinearAlgebra, Plots, GmshTools, LaTeXStrings, LinearMaps, IterativeSolvers
-using Nystrom: SingleLayerKernel, DoubleLayerKernel, Laplace, Stokes, quadgen, SingleLayerPotential, DoubleLayerPotential,
-    Helmholtz, Stokes, Maxwell, SingleLayerOperator, DoubleLayerOperator, IOpCorrection, AdjointDoubleLayerKernel,
-    HypersingularKernel, AdjointDoubleLayerOperator, HypersingularOperator
-
-function compute_error(op,Γ,qorder,dim=2)
-    gmres_iter = Int[]
-    nn     = Int[]
-    ee     = Float64[]
-    quad        = quadgen(Γ,qorder)
-    npts = length(quad.nodes)
-    nodes_per_element = quad.nodes_per_element
-    nsources    = 3*quad.nodes_per_element
-    sources     = dim == 2 ? Nystrom.circle_sources(nsources) : Nystrom.sphere_sources_lebedev(nsources)
-    SL_kernel   = SingleLayerKernel{dim}(op)
-    DL_kernel   = DoubleLayerKernel{dim}(op)
-    ADL_kernel   = AdjointDoubleLayerKernel{dim}(op)
-    HS_kernel   = HypersingularKernel{dim}(op)
-    ADL_op      = AdjointDoubleLayerOperator(ADL_kernel,quad)
-    HS_op       = HypersingularOperator(HS_kernel,quad)
-    ADL_matrix   = Matrix(ADL_op)
-    HS_matrix   = Matrix(HS_op)
-    ADLH_corr        = IOpCorrection(ADL_op,ADL_matrix,HS_matrix,sources);
-    SL_kernel   = SingleLayerKernel{dim}(op)
-    DL_kernel   = DoubleLayerKernel{dim}(op)
-    SL_op       = SingleLayerOperator(SL_kernel,quad)
-    DL_op       = DoubleLayerOperator(DL_kernel,quad)
-    SL_matrix   = Matrix(SL_op)
-    DL_matrix   = Matrix(DL_op)
-    SLDL_corr        = IOpCorrection(SL_op,SL_matrix,DL_matrix,sources);
-    # exact solution as linear combination of rows of Greens tensor
-    xₛ          = 3*ones(Point{dim})
-    # trace of exact solution
-    T           = eltype(SL_kernel)
-    T <: Number ? c = one(T) : c = ones(size(T)[1])
-    γ₀U         = [transpose(SL_kernel(xₛ,y))*c   for  y in quad.nodes]
-    γ₁U         = [transpose(DL_kernel(xₛ,y,ny))*c for  (y,ny) in zip(quad.nodes,quad.normals)];
-    ADL1(u)      = ADL_matrix*u  - ADLH_corr(u,0,-1)
-    HS1(u)      =  HS_matrix*u  -  ADLH_corr(u,1,0)
-    # error in trace
-    L = LinearMap(du -> -du/2 + ADL1(du),npts)
-    rhs = HS1(γ₀U)
-    du,ch = gmres(L,rhs,verbose=false,log=true,tol=1e-8,restart=1000)
-    er1 = γ₁U - du
-    println("k = $(op.k):")
-    println("npts = $npts")
-    println("iter = $(ch.iters):")
-    println("error = $(norm(er1,Inf)):")
-    # error in derivative of greens identity
-    return npts,ch.iters,norm(er1,Inf)
-end
+using Nystrom, FastGaussQuadrature, Plots, LinearAlgebra, IterativeSolvers, ParametricSurfaces
+using Nystrom: sphere_helmholtz_soundsoft, error_exterior_green_identity, Point
 
 function fig_gen()
-    fig = plot()
-    for qorder = (2,3,4,5)
-        Γ = Nystrom.circle()
-        for _ in 1:4; Nystrom.refine!(Γ); end
-        krange = 2 .^ (1:7)
-        nn = Int[]
-        ii = Int[]
-        ee = Float64[]
-        for k = krange
-            op = Helmholtz(k)
-            npts, iter, er = compute_error(op,Γ,qorder)
-            push!(nn,npts)
-            push!(ii,iter)
-            push!(ee,er)
-            Nystrom.refine!(Γ)
+    dim = 3
+    R = 1
+    geo = Sphere(radius=R)
+    fig       = plot(yscale=:log10,xscale=:log10,xlabel="√N",ylabel="error")
+    qorder    = (2,3,4)
+    h0        = 2.0
+    niter     = 3
+    k         = 2π
+    pde       = Helmholtz(dim=dim,k=k)
+    θ         = rand()*π
+    ϕ         = rand()*2π
+    ue(x) = sphere_helmholtz_soundsoft(x;radius=R,k=k,θin=θ,ϕin = ϕ)
+    xtest = [Point(2*R*sin(θ)*cos(ϕ),2*R*sin(θ)*sin(ϕ),2*R*cos(θ)) for θ in 0:0.1:π, ϕ in 0:0.1:2π]
+    Ue    = [ue(x) for x in xtest]
+    kx = k*sin(θ)*cos(ϕ)
+    ky = k*sin(θ)*sin(ϕ)
+    kz = k*cos(θ)
+    for p in qorder
+        conv_order = p + 1
+        meshgen!(geo,h0)
+        gmres_iter = []
+        dof        = []
+        ee         = []
+        for _ in 1:niter
+            Γ     = quadgen(geo,p,gausslegendre)
+            S,D   = single_double_layer(pde,Γ)
+            γ₀U   = γ₀( (y) -> -exp(im*(kx*y[1] + ky*y[2] +  kz*y[3])), Γ)
+            σ,ch  = gmres(I/2 + D - im*k*S,γ₀U,verbose=false,log=true,tol=1e-14,restart=100)
+            ua(x) = DoubleLayerPotential(pde,Γ)(σ,x) - im*k*SingleLayerPotential(pde,Γ)(σ,x)
+            Ua    = [ua(x) for x in xtest]
+            push!(ee,norm(Ue.-Ua,Inf)/norm(Ue,Inf))
+            push!(dof,length(Γ))
+            @show length(Γ), ee[end], ch.iters
+            refine!(geo)
         end
-        plot!(fig,krange,ii,xlabel="k",ylabel="gmres iterations",marker=:x,
-              label="M=$qorder")
+        dof = sqrt.(dof) # dof per dimension, roughly inverse of mesh size
+        plot!(fig,dof,ee,label=Nystrom.getname(pde)*": p=$p",m=:o,color=p)
+        plot!(fig,dof,1 ./(dof.^conv_order)*dof[end]^(conv_order)*ee[end],
+              label="",linewidth=4,color=p)
     end
     return fig
 end
 
 fig = fig_gen()
-fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/figures/fig4b"
+fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig4b.pdf"
 savefig(fig,fname)
+display(fig)
+

@@ -225,44 +225,6 @@ function tensorquadrature(p::NTuple{M},geo::Vector{ParametricBody{M,N,T}},algo) 
     return quad
 end
 
-# FIXME: copied from GeometryTypes.jl because there was a bug creating a polygon
-# from the package. Should investigate this whenever I have time.
-function Base.in(point::Point, points::Vector{<:Point})
-    # (point in boundingbox(poly)) || return false
-    c = false
-    detq(q1, q2, point) = (q1[1]-point[1])*(q2[2]-point[2])-(q2[1]-point[1])*(q1[2]-point[2])
-    for i in 1:length(points)-1
-        q1,q2 = points[i],points[i+1]
-        if q1 == point
-            @warn("point on polygon vertex - returning false")
-            return false
-        end
-        if q2[2] == point[2]
-            if q2[1] == point[1]
-                @warn("point on polygon vertex - returning false")
-                return false
-            elseif (q1[2] == point[2]) && ((q2[1] > x) == (q1[1] < point[1]))
-                @warn("point on edge - returning false")
-                return false
-            end
-        end
-        if (q1[2] < point[2]) != (q2[2] < point[2]) # crossing
-            if q1[1] >= point[1]
-                if q2[1] > point[1]
-                    c = !c
-                elseif ((detq(q1,q2,point) > 0) == (q2[2] > q1[2])) # right crossing
-                    c = !c
-                end
-            elseif q2[1] > point[1]
-                if ((detq(q1,q2,point) > 0) == (q2[2] > q1[2])) # right crossing
-                    c = !c
-                end
-            end
-        end
-    end
-    return c
-end
-
 ################################################################################
 ## PLOT RECIPES
 ################################################################################

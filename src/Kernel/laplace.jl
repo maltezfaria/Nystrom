@@ -6,8 +6,8 @@ Laplace(;dim=3) = Laplace{dim}()
 
 getname(::Laplace) = "Laplace"
 
-default_kernel_type(::Laplace) = Float64
-default_density_type(::Laplace{N}) where {N} = Float64
+default_kernel_eltype(::Laplace) = Float64
+default_density_eltype(::Laplace{N}) where {N} = Float64
 
 # Single Layer
 function (SL::SingleLayerKernel{T,Laplace{N}})(x,y)::T  where {N,T}

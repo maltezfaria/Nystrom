@@ -1,69 +1,50 @@
-using Nystrom, Test, Logging, GeometryTypes, LinearAlgebra, Plots, GmshTools, LaTeXStrings, LinearMaps, IterativeSolvers
-using Nystrom: SingleLayerKernel, DoubleLayerKernel, Laplace, Stokes, quadgen, SingleLayerPotential, DoubleLayerPotential,
-    Helmholtz, Stokes, Maxwell, SingleLayerOperator, DoubleLayerOperator, IOpCorrection, AdjointDoubleLayerKernel,
-    HypersingularKernel, AdjointDoubleLayerOperator, HypersingularOperator
+using Nystrom, FastGaussQuadrature, Plots, LinearAlgebra, IterativeSolvers, ParametricSurfaces
+using Nystrom: circle_helmholtz_soundsoft, error_exterior_green_identity, Point
 
-function compute_error(op,Γ,qorder,dim=2)
-    gmres_iter = Int[]
-    nn     = Int[]
-    ee     = Float64[]
-    quad        = quadgen(Γ,qorder)
-    npts = length(quad.nodes)
-    nodes_per_element = quad.nodes_per_element
-    nsources    = 3*quad.nodes_per_element
-    sources     = dim == 2 ? Nystrom.circle_sources(nsources) : Nystrom.sphere_sources_lebedev(nsources)
-    SL_kernel   = SingleLayerKernel{dim}(op)
-    DL_kernel   = DoubleLayerKernel{dim}(op)
-    SL_op       = SingleLayerOperator(SL_kernel,quad)
-    DL_op       = DoubleLayerOperator(DL_kernel,quad)
-    SL_matrix   = Matrix(SL_op)
-    DL_matrix   = Matrix(DL_op)
-    SLDL_corr        = IOpCorrection(SL_op,SL_matrix,DL_matrix,sources);
-    # exact solution as linear combination of rows of Greens tensor
-    xₛ          = 3*ones(Point{dim})
-    # trace of exact solution
-    T           = eltype(SL_kernel)
-    T <: Number ? c = one(T) : c = ones(size(T)[1])
-    γ₀U         = [transpose(SL_kernel(xₛ,y))*c   for  y in quad.nodes]
-    γ₁U         = [transpose(DL_kernel(xₛ,y,ny))*c for  (y,ny) in zip(quad.nodes,quad.normals)];
-    SL1(u)      = SL_matrix*u  - SLDL_corr(u,0,-1)
-    DL1(u)      = DL_matrix*u  - SLDL_corr(u,1,0)
-    # error in trace
-    L = LinearMap(u -> u/2 + DL1(u),npts)
-    rhs = SL1(γ₁U)
-    du,ch = gmres(L,rhs,verbose=false,log=true,tol=1e-8,restart=1000)
-    er1 = γ₀U - du
-    println("k = $(op.k):")
-    println("npts = $npts")
-    println("iter = $(ch.iters):")
-    println("error = $(norm(er1,Inf)):")
-    # error in derivative of greens identity
-    return npts,ch.iters,norm(er1,Inf)
-end
-
-function fig_gen()
-    fig = plot()
-    for qorder = (2,3,4,5)
-        Γ = Nystrom.kite()
-        for _ in 1:3; Nystrom.refine!(Γ); end
-        krange = 2 .^ (1:7)
-        nn = Int[]
-        ii = Int[]
-        ee = Float64[]
-        for k = krange
-            op = Helmholtz(k)
-            npts, iter, er = compute_error(op,Γ,qorder)
-            push!(nn,npts)
-            push!(ii,iter)
-            push!(ee,er)
-            Nystrom.refine!(Γ)
+function scattering_helmholtz_circle_soundsoft(qorder,h,niter)
+    dim = 2
+    R = 1
+    geo = Circle(radius=R)
+    xtest = [Point(2*R*cos(θ),2*R*sin(θ)) for θ in 0:0.1:2π]
+    fig       = plot(yscale=:log10,xscale=:log10,xlabel="N",ylabel="error")
+    k         = 2π
+    pde       = Helmholtz(dim=dim,k=k)
+    ue(x) = circle_helmholtz_soundsoft(x;radius=R,θin=θ,k=k)
+    θ     = 2π/3
+    kx    = cos(θ)*k
+    ky    = sin(θ)*k
+    for p in qorder
+        conv_order = p + 1
+        meshgen!(geo,h)
+        gmres_iter = []
+        dof        = []
+        ee         = []
+        for _ in 1:niter
+            Γ = quadgen(geo,p,gausslegendre)
+            S,D   = single_double_layer(pde,Γ)
+            γ₀U   = γ₀((y) -> -exp(im*((kx,ky) ⋅ y)),Γ)
+            σ,ch  = gmres(I/2 + D - im*k*S,γ₀U,verbose=false,log=true,tol=1e-14,restart=100)
+            ua(x) = DoubleLayerPotential(pde,Γ)(σ,x) - im*k*SingleLayerPotential(pde,Γ)(σ,x)
+            Ue    = [ue(x) for x in xtest]
+            Ua    = [ua(x) for x in xtest]
+            push!(ee,norm(Ue.-Ua,Inf)/norm(Ue,Inf))
+            @show length(Γ),ee[end], ch.iters
+            push!(dof,length(Γ))
+            refine!(geo)
         end
-        plot!(fig,krange,ii,xlabel="k",ylabel="gmres iterations",marker=:x,
-              label="M=$qorder")
+        plot!(fig,dof,ee,label=Nystrom.getname(pde)*": p=$p",m=:o,color=p)
+        plot!(fig,dof,1 ./(dof.^conv_order)*dof[end]^(conv_order)*ee[end],
+              label="",linewidth=4,color=p)
     end
     return fig
 end
 
-fig = fig_gen()
-fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/figures/fig4a.svg"
+
+qorder = (2,3,4)
+h      = 0.1
+niter  = 4
+fig    = scattering_helmholtz_circle_soundsoft(qorder,h,niter)
+fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig4a.pdf"
 savefig(fig,fname)
+display(fig)
+

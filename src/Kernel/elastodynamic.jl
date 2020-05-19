@@ -12,8 +12,8 @@ Elastodynamic{N}(μ::T,λ::T,ω::T,ρ::T) where {N,T} = Elastodynamic{N,T}(μ,λ
 
 getname(::Elastodynamic) = "Elastodynamic"
 
-default_kernel_type(::Elastodynamic{N}) where {N} = Mat{N,N,ComplexF64,N*N}
-default_density_type(::Elastodynamic{N}) where {N} = Vec{N,ComplexF64}
+default_kernel_eltype(::Elastodynamic{N}) where {N} = Mat{N,N,ComplexF64,N*N}
+default_density_eltype(::Elastodynamic{N}) where {N} = Vec{N,ComplexF64}
 
 # Single Layer
 function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:Elastodynamic}
