@@ -6,7 +6,8 @@ function scattering_helmholtz_circle_soundsoft(qorder,h,niter)
     R = 1
     geo = Circle(radius=R)
     xtest = [Point(2*R*cos(θ),2*R*sin(θ)) for θ in 0:0.1:2π]
-    fig       = plot(yscale=:log10,xscale=:log10,xlabel="N",ylabel="error")
+    fig       = plot(yscale=:log10,xscale=:log10,xlabel="N",ylabel="error",
+                     framestyle=:box,xtickfontsize=10,ytickfontsize=10)
     k         = 2π
     pde       = Helmholtz(dim=dim,k=k)
     ue(x) = circle_helmholtz_soundsoft(x;radius=R,θin=θ,k=k)
@@ -24,10 +25,10 @@ function scattering_helmholtz_circle_soundsoft(qorder,h,niter)
             S,D   = single_double_layer(pde,Γ)
             γ₀U   = γ₀((y) -> -exp(im*((kx,ky) ⋅ y)),Γ)
             σ,ch  = gmres(I/2 + D - im*k*S,γ₀U,verbose=false,log=true,tol=1e-14,restart=100)
-            ua(x) = DoubleLayerPotential(pde,Γ)(σ,x) - im*k*SingleLayerPotential(pde,Γ)(σ,x)
+            ua    = (x) -> DoubleLayerPotential(pde,Γ)(σ,x) - im*k*SingleLayerPotential(pde,Γ)(σ,x)
             Ue    = [ue(x) for x in xtest]
             Ua    = [ua(x) for x in xtest]
-            push!(ee,norm(Ue.-Ua,Inf)/norm(Ue,Inf))
+            push!(ee,norm(Ue.-Ua,Inf))
             @show length(Γ),ee[end], ch.iters
             push!(dof,length(Γ))
             refine!(geo)
@@ -47,4 +48,3 @@ fig    = scattering_helmholtz_circle_soundsoft(qorder,h,niter)
 fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig4a.pdf"
 savefig(fig,fname)
 display(fig)
-

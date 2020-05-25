@@ -1,88 +1,114 @@
-using Nystrom, Test, Logging, GeometryTypes, LinearAlgebra, Plots, gmsh
-using Nystrom: SingleLayerKernel, DoubleLayerKernel, Laplace, Stokes, quadgen, SingleLayerPotential, DoubleLayerPotential,
-    Helmholtz, Stokes, Maxwell, SingleLayerOperator, DoubleLayerOperator, IOpCorrection, AdjointDoubleLayerKernel,
-    HypersingularKernel, AdjointDoubleLayerOperator, HypersingularOperator
+using Nystrom, FastGaussQuadrature, Plots, LinearAlgebra, ParametricSurfaces, LaTeXStrings
+using Nystrom: error_interior_green_identity, error_interior_derivative_green_identity
 
-dim = 3
-op  = Laplace()
-# op  = Helmholtz(1)
-# op  = Laplace()
-# op  = Elastostatic(1,1)
-niter = 4
-qorder = 3
-
-############################################################
-# create a geometry using
-if dim == 2
-    Γ = Nystrom.ellipsis([1,2])
-    Nystrom.refine!(Γ)
-elseif dim == 3
-    Γ = Nystrom.sphere()
-end
-############################################################
-
-nn     = Int[]
-ee     = Float64[]
-ee0 = Float64[]
-for iter in 1:niter
-    quad        = quadgen(Γ,qorder)
-    npts = length(quad.nodes)
-    global nodes_per_element = quad.nodes_per_element
-    push!(nn,npts)
-    println("DOF: $(npts)")
-    println("nodes per element: $(quad.nodes_per_element)")
-    nsources    = 2*quad.nodes_per_element
-    # sources     = dim == 2 ? Nystrom.circle_sources(nsources) : Nystrom.sphere_sources_uniform(nsources)
-    sources     = dim == 2 ? Nystrom.circle_sources(nsources) : Nystrom.sphere_sources_lebedev(nsources)
-    println("number of basis for interpolation: $(length(sources))")
-    SL_kernel   = SingleLayerKernel{dim}(op)
-    DL_kernel   = DoubleLayerKernel{dim}(op)
-    SL_op       = SingleLayerOperator(SL_kernel,quad)
-    DL_op       = DoubleLayerOperator(DL_kernel,quad)
-    SL_matrix   = Matrix(SL_op)
-    DL_matrix   = Matrix(DL_op)
-    SLDL_corr        = IOpCorrection(SL_op,SL_matrix,DL_matrix,sources);
-    # exact solution as linear combination of rows of Greens tensor
-    xₛ          = 3*ones(Point{dim})
-    # trace of exact solution
-    T           = eltype(SL_kernel)
-    T <: Number ? c = ones() : c = ones(size(T)[1])
-    γ₀U         = [transpose(SL_kernel(xₛ,y))*c   for  y in quad.nodes]
-    γ₁U         = [transpose(DL_kernel(xₛ,y,ny))*c for  (y,ny) in zip(quad.nodes,quad.normals)];
-    SL1(u)      = SL_matrix*u  - SLDL_corr(u,0,-1)
-    DL1(u)      = DL_matrix*u  - SLDL_corr(u,1,0)
-    # error in greens
-    er0 = γ₀U/2 - SL_matrix*γ₁U + DL_matrix*γ₀U
-    er1 = γ₀U/2 - SL1(γ₁U) + DL1(γ₀U)
-    push!(ee0,norm(er0,Inf))
-    push!(ee,norm(er1,Inf))
-    println("Greens identity error:")
-    println("$op $dim $(norm(er0,Inf))")
-    println("$op $dim $(norm(er1,Inf))")
-    # error in derivative of greens identity
-    Nystrom.refine!(Γ)
-end
-
-if isa(op,Maxwell)
-        order = qorder-1
-        order0 = -1
-elseif isa(op,Elastostatic)
-    order = qorder
-    order0 = 0
-elseif isa(op,Union{Helmholtz,Laplace})
-    if dim == 2
-        order = qorder + 1
-        order0 = 1
-    elseif dim == 3
-        order = qorder +1
-        order0 = 1
+function convergence_interior_greens_identity(op,dim,qorder,h,niter;derivative=false)
+    geo = dim == 2 ? Circle() : Sphere()
+    fig       = plot(yscale=:log10,xscale=:log10,
+                     xlabel= dim==2 ? L"N" : L"\sqrt{N}",ylabel="error",legend=:bottomleft,
+                     framestyle=:box,xtickfontsize=10,ytickfontsize=10)
+    cc = 1
+    colors = [:red,:green,:blue,:yellow,:black,:pink]
+    # construct interior solution
+    xout = 3 * ones(dim)
+    c    = op isa Helmholtz ? 1 : ones(dim)
+    u    = (x)   -> SingleLayerKernel(op)(xout,x)*c
+    dudn = (x,n) -> transpose(DoubleLayerKernel(op)(xout,x,n))*c
+    for p in qorder
+        if op isa Helmholtz
+            conv_order = derivative ? p-1 : p+1
+        else
+            conv_order = derivative ? p-1 : p
+        end
+        meshgen!(geo,h)
+        dof         = []
+        ee_interior = []
+        for _ in 1:niter
+            Γ = quadgen(geo,p,gausslegendre)
+            γ₀u       = γ₀(u,Γ)
+            γ₁u       = γ₁(dudn,Γ)
+            if derivative==false
+                S,D   = single_double_layer(op,Γ)
+                ee    = error_interior_green_identity(S,D,γ₀u,γ₁u)
+            else
+                ADL,H = adjointdoublelayer_hypersingular(op,Γ)
+                ee    = error_interior_derivative_green_identity(ADL,H,γ₀u,γ₁u)
+            end
+            # test interior Green identity
+            push!(ee_interior,norm(ee,Inf)/norm(γ₀u,Inf))
+            push!(dof,length(Γ))
+            refine!(geo)
+        end
+        dof_per_dim = dim == 2 ? dof : sqrt.(dof)
+        plot!(fig,dof_per_dim,ee_interior,label=Nystrom.getname(op)*": p=$p",m=:o,color=colors[cc])
+        if dim == 2
+            plot!(fig,dof_per_dim,
+                  log10.(dof_per_dim)./(dof_per_dim.^conv_order)*dof_per_dim[end]^(conv_order)/log10(dof_per_dim[end])*ee_interior[end],
+                  label="",linewidth=4,line=:dot,color=colors[cc])
+        else
+            plot!(fig,dof_per_dim,1 ./(dof_per_dim.^conv_order)*dof_per_dim[end]^(conv_order)*ee_interior[end],
+                  label="",linewidth=4,line=:dot,color=colors[cc])
+        end
+        cc += 1
     end
+    return fig
 end
-hh =  nn .^ (-1/(dim-1))
-plot(hh,1 ./ hh.^(-order)*hh[end]^(-order)*ee[end],xscale=:log10,yscale=:log10,label="order=$order",xlabel="h")
-plot!(hh,ee,marker=:x,label="greens")
-##
-plot!(hh,ee0,marker=:x,label="greens")
-plot!(hh,1 ./ hh.^(-order0)*hh[end]^(-order0)*ee0[end],xscale=:log10,yscale=:log10,label="order=$order0",xlabel="h")
 
+# figure1
+dim       = 2
+qorder    = (2,3,4)
+h         = 1.0
+niter     = 6
 
+# #1a
+# operators = Helmholtz(dim =dim,k =1)
+# fig       = convergence_interior_greens_identity(operators,dim,qorder,h,niter;derivative=false)
+# fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1a.pdf"
+# savefig(fig,fname)
+
+# # 1b
+# operators = Helmholtz(dim =dim,k =1)
+# fig       = convergence_interior_greens_identity(operators,dim,qorder,h,niter;derivative=true)
+# fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1b.pdf"
+# savefig(fig,fname)
+
+# # 1c
+# operators = Elastodynamic(dim=dim,μ=1,ρ=1,λ=1,ω=1)
+# fig       = convergence_interior_greens_identity(operators,dim,qorder,h,niter;derivative=false)
+# fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1c.pdf"
+# savefig(fig,fname)
+
+# # figure1d
+# operators = Elastodynamic(dim =dim,μ =1,ρ =1,λ =1,ω =1)
+# fig       = convergence_interior_greens_identity(operators,dim,qorder,h,niter;derivative=true)
+# fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1d.pdf"
+# savefig(fig,fname)
+
+# figure2
+dim       = 3
+qorder    = (2,3,4)
+h         = 2.0
+niter     = 4
+
+# #2a
+# operator  = Helmholtz(dim=dim,k =1)
+# fig       = convergence_interior_greens_identity(operator,dim,qorder,h,niter;derivative=false)
+# fname     = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig2a.pdf"
+# savefig(fig,fname)
+
+# #2b
+# operator = Helmholtz(dim =dim,k =1)
+# fig       = convergence_interior_greens_identity(operator,dim,qorder,h,niter;derivative=true)
+# fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig2b.pdf"
+# savefig(fig,fname)
+
+# #2c
+# operator = Elastodynamic(dim =dim,μ =1,ρ =1,λ =1,ω =1)
+# fig       = convergence_interior_greens_identity(operator,dim,qorder,h,niter;derivative=false)
+# fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig2c.pdf"
+# savefig(fig,fname)
+
+#2d
+operators = Elastodynamic(dim =dim,μ =1,ρ =1,λ =1,ω =1)
+fig       = convergence_interior_greens_identity(operators,dim,qorder,h,niter;derivative=true)
+fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig2d.pdf"
+savefig(fig,fname)

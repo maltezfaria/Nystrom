@@ -1,12 +1,12 @@
 using Nystrom, FastGaussQuadrature, Plots, LinearAlgebra, IterativeSolvers, ParametricSurfaces
 using ParametricSurfaces: getnodes
-using Nystrom: error_interior_green_identity, error_exterior_green_identity
+using Nystrom: error_interior_green_identity, error_exterior_green_identity, Point
 
 function near_field_error(pde,dim,p,h)
     geo = dim == 2 ? Kite() : Bean()
-    fig = plot(ylabel="y",xlabel="x",size=(450,400),clims=(-8,-4))
+    fig = plot(size=(450,400),clims=(-6,0),framestyle=:box)
     # construct exterior solution
-    xin  = (0.1,0.)
+    xin  = Point(0.0,0.)
     c    = pde isa Union{Helmholtz,Laplace} ? 1 : ones(dim)
     u    = (x)   -> SingleLayerKernel(pde)(xin,x)*c
     dudn = (x,n) -> transpose(DoubleLayerKernel(pde)(xin,x,n))*c
@@ -34,14 +34,14 @@ function near_field_error(pde,dim,p,h)
     SL, DL = single_double_layer(pde,Xup,Γ;correction=:nothing)
     U  = DL*σ - im*pde.k*SL*σ
     U  = reshape(U,length(yup),length(x))
-    field_error = log.(abs.(U-Uup) .* isoutside)  
+    field_error = log10.(abs.(U-Uup) .* isoutside)
     heatmap!(fig,x,yup,field_error)
     # error correction
     isoutside = [in(pt,poly) ? -Inf : 1 for pt in Xdown]
     SL, DL = single_double_layer(pde,Xdown,Γ)
     U  = DL*σ - im*pde.k*SL*σ
     U  = reshape(U,length(ydown),length(x))
-    field_error = log.(abs.(U-Udown)) .* isoutside
+    field_error = log10.(abs.(U-Udown)) .* isoutside
     heatmap!(fig,x,ydown,field_error)
     meshgen!(geo,1e-2)
     plot!(fig,geo,lc=:black,lw=2)
@@ -50,20 +50,10 @@ end
 
 # figure 3a
 dim       = 2
-p         = 3
+p         = 4
 h         = 0.1
-pde        = Helmholtz(dim=dim,k=2π)
+pde       = Helmholtz(dim=dim,k=2π)
 fig       = near_field_error(pde,dim,p,h)
 fname     = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig3c.pdf"
 savefig(fig,fname)
 display(fig)
-
-# figure 3b
-# dim       = 3
-# p         = 2
-# h         = 1
-# pde        = Helmholtz(dim=dim,k=2π)
-# fig       = near_field_error(pde,dim,p,h)
-# fname     = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig3b.pdf"
-# savefig(fig,fname)
-# display(fig)
