@@ -2,6 +2,7 @@ module Nystrom
 
 using GeometryTypes: Point, Normal, Mat
 using LinearAlgebra
+using Base.Threads
 using SpecialFunctions
 using RecipesBase
 using DoubleFloats
@@ -9,7 +10,8 @@ using Suppressor
 using IterativeSolvers
 using SparseArrays
 using GSL
-using GmshTools
+# using GmshTools
+using gmsh
 using Printf
 
 export
