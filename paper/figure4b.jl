@@ -5,14 +5,15 @@ function fig_gen()
     dim = 3
     R = 1
     geo = Sphere(radius=R)
-    fig       = plot(yscale=:log10,xscale=:log10,xlabel="√N",ylabel="error")
+    fig       = plot(yscale=:log10,xscale=:log10,xlabel="√N",ylabel="error",
+                     framestyle=:box,xtickfontsize=10,ytickfontsize=10)
     qorder    = (2,3,4)
     h0        = 2.0
-    niter     = 3
+    niter     = 5
     k         = 2π
     pde       = Helmholtz(dim=dim,k=k)
-    θ         = rand()*π
-    ϕ         = rand()*2π
+    θ         = π/2
+    ϕ         = 0
     ue(x) = sphere_helmholtz_soundsoft(x;radius=R,k=k,θin=θ,ϕin = ϕ)
     xtest = [Point(2*R*sin(θ)*cos(ϕ),2*R*sin(θ)*sin(ϕ),2*R*cos(θ)) for θ in 0:0.1:π, ϕ in 0:0.1:2π]
     Ue    = [ue(x) for x in xtest]
@@ -37,9 +38,9 @@ function fig_gen()
             @show length(Γ), ee[end], ch.iters
             refine!(geo)
         end
-        dof = sqrt.(dof) # dof per dimension, roughly inverse of mesh size
-        plot!(fig,dof,ee,label=Nystrom.getname(pde)*": p=$p",m=:o,color=p)
-        plot!(fig,dof,1 ./(dof.^conv_order)*dof[end]^(conv_order)*ee[end],
+        dof_per_dim = sqrt.(dof) # dof per dimension, roughly inverse of mesh size
+        plot!(fig,dof_per_dim,ee,label=Nystrom.getname(pde)*": p=$p",m=:o,color=p)
+        plot!(fig,dof_per_dim,1 ./(dof_per_dim.^conv_order)*dof_per_dim[end]^(conv_order)*ee[end],
               label="",linewidth=4,color=p)
     end
     return fig
@@ -49,4 +50,3 @@ fig = fig_gen()
 fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig4b.pdf"
 savefig(fig,fname)
 display(fig)
-
