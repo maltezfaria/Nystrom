@@ -18,7 +18,7 @@ function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:Helmholtz}
     x==y && return zero(T)
     k = SL.op.k
     r = x .- y
-    d = norm(x .- y)
+    d = norm(r)
     if N==2
         return im/4 * hankelh1(0,k*d)
     elseif N==3
@@ -32,7 +32,7 @@ function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:Helmholtz}
     x==y && return 0
     k = DL.op.k
     r = x .- y
-    d = norm(x .- y)
+    d = norm(r)
     if N==2
         return im*k/4/d * hankelh1(1,k*d) .* dot(r,ny)
     elseif N==3

@@ -52,7 +52,7 @@ function sphere_helmholtz_soundsoft(xobs;radius=1,k=1,θin=0,ϕin=0)
     r < radius && return u
     c(l,m) = -4π*im^l*sphharmonic(l,-m,θin,ϕin)*sphbesselj(l,k*radius)/sphbesselh(l,k*radius)
     l = 0
-    for l=0:40
+    for l=0:60
         for m=-l:l
             u += c(l,m)*sphbesselh(l,k*r)*sphharmonic(l,m,θ,ϕ)
         end
