@@ -49,22 +49,26 @@ function GreensCorrection(iop::IntegralOperator{T,K},Op1,Op2,basis,γ₁_basis,�
     nbasis      = length(basis)
 
     # compute matrix of basis evaluated on Y
-    γ₀B = Matrix{T}(undef,length(Y),nbasis)
-    γ₁B = Matrix{T}(undef,length(Y),nbasis)
+    γ₀B     = Matrix{T}(undef,length(Y),nbasis)
+    γ₁B     = Matrix{T}(undef,length(Y),nbasis)
+    ynodes   = getnodes(Y)
+    ynormals = getnormals(Y)
     for k in 1:nbasis
-        γ₀B[:,k] = γ₀(basis[k],Y)
-        γ₁B[:,k] = γ₁(γ₁_basis[k],Y)
+        for i in 1:length(ynodes)
+            γ₀B[i,k] = basis[k](ynodes[i])
+            γ₁B[i,k] = γ₁_basis[k](ynodes[i],ynormals[i])
+        end
     end
 
     # integrate the basis over Y
     R  = Op1*γ₁B - Op2*γ₀B
     if kernel_type(iop) isa Union{SingleLayer,DoubleLayer}
         if σ == -0.5
-            R  += σ*γ₀B
+            axpy!(σ,γ₀B,R) # R  += σ*γ₀B
         end
     elseif kernel_type(iop) isa Union{AdjointDoubleLayer,HyperSingular}
         if σ == -0.5
-            R  += σ*γ₁B
+            axpy!(σ,γ₁B,R) #  R  += σ*γ₁B
         end
     end
 
@@ -120,19 +124,22 @@ function precompute_weights_qr(c::GreensCorrection{T}) where {T<:Number}
     iop  = c.iop
     a,b  = combined_field_coefficients(iop.kernel)
     X,Y  = iop.X, iop.Y
-    QRType = Base.promote_op(qr,Matrix{T})
-    LQR  = Vector{QRType}(undef,length(c.L))
-    for i in 1:size(c,1)
+    QRTYPE = Base.promote_op(qr,Matrix{T})
+    F      = Vector{QRTYPE}(undef,length(c.L))
+    mutex = Threads.SpinLock()
+    @threads for i in 1:size(c,1)
         idx_el    = c.idxel_near[i]
         idx_el < 0 && continue
         idx_nodes = getelements(iop.Y)[idx_el]
         ninterp = length(idx_nodes)
-        if !isassigned(LQR,idx_el)
-            LQR[idx_el] = qr(c.L[idx_el])
+        if !isassigned(F,idx_el)
+            lock(mutex)
+            F[idx_el]  = qr(c.L[idx_el])
+            unlock(mutex)
         end
-        F       = LQR[idx_el]
-        tmp     = (c.R[i:i,:]*pinv(F.R))*adjoint(F.Q)
-        w[i]     = @views a*tmp[1:ninterp] + b*tmp[ninterp+1:end]
+        tmp     = (c.R[i:i,:]/F[idx_el].R)*adjoint(F[idx_el].Q)
+        w[i]     = axpby!(a,view(tmp,1:ninterp),b,view(tmp,(ninterp+1):(2*ninterp)))
+        # w[i]   = @views a*tmp[1:ninterp]) + b*tmp[ninterp+1:end]
     end
     return w
 end
@@ -140,25 +147,45 @@ end
 # Tensor case. We need to convert the *matrix of matrices* structures to flat
 # matrices for doing qr, then convert back. Not very efficient... but may be not
 # very important?
-function precompute_weights_qr(c::GreensCorrection{T}) where {T<:Mat}
+function precompute_weights_qr(c::GreensCorrection{T}) where {T<:AbstractMatrix{S}} where {S}
     w   = [Vector{T}() for _ in 1:size(c,1)]
     iop = c.iop
     a,b = combined_field_coefficients(iop.kernel)
     X,Y = iop.X, iop.Y
-    QRType = Base.promote_op(qr,Matrix{eltype(T)})
-    LQR    = Vector{QRType}(undef,length(c.L))
+    QRTYPE = Base.promote_op(qr,Matrix{S})
+    F    = Vector{QRTYPE}(undef,length(c.L))
     for i in 1:size(c,1)
         idx_el    = c.idxel_near[i]
         idx_el < 0 && continue
         idx_nodes = getelements(iop.Y)[idx_el]
         ninterp = length(idx_nodes)
-        if !isassigned(LQR,idx_el)
-            LQR[idx_el] = qr(Matrix(c.L[idx_el]))
+        if !isassigned(F,idx_el)
+            F[idx_el]         = qr!(Matrix(c.L[idx_el]))
         end
-        F    = LQR[idx_el]
-        tmp  = (Matrix(c.R[i:i,:])*pinv(F.R))*adjoint(F.Q)
+        tmp  = (Matrix(c.R[i:i,:])/F[idx_el].R)*adjoint(F[idx_el].Q)
         tmp2 = matrix_to_blockmatrix(T,tmp)
         w[i] = @views a*tmp2[1:ninterp] + b*tmp2[ninterp+1:end]
+    end
+    return w
+end
+
+function precompute_weights_tikhonov(c::GreensCorrection{T},δ=0) where {T<:Number}
+    w = [Vector{T}() for _ in 1:size(c,1)]
+    iop  = c.iop
+    a,b  = combined_field_coefficients(iop.kernel)
+    X,Y     = iop.X, iop.Y
+    Linv    = Vector{Matrix{T}}(undef,length(c.L))
+    for i in 1:size(c,1)
+        idx_el    = c.idxel_near[i]
+        idx_el < 0 && continue
+        idx_nodes = getelements(iop.Y)[idx_el]
+        ninterp = length(idx_nodes)
+        if !isassigned(Linv,idx_el)
+            L = c.L[idx_el]
+            Linv[idx_el] = (δ*I + adjoint(L)*L)\adjoint(L)
+        end
+        tmp     = c.R[i:i,:]*Linv[idx_el]
+        w[i]     = @views a*tmp[1:ninterp] + b*tmp[ninterp+1:end]
     end
     return w
 end
@@ -197,7 +224,7 @@ function invert_green_matrix(L::AbstractMatrix{T},S=Float64) where {T<:Number}
         if S===Float64
             Linv = invert_green_matrix(L,Double64)
         else
-            @debug er
+            error("failed to invert green marrix: er = $(er)")
         end
     end
     return Linv
@@ -273,23 +300,24 @@ function nearest_element_list(X,Y; tol=0)
     xnodes = getnodes(X)
     ynodes = getnodes(Y)
     in2e   = idx_nodes_to_elements(Y)
-    # special case (which arises often for integral operators) where X==Y.
-    # No distance computation is needed then
     if X == Y
+        # special case (which arises often for integral operators) where X==Y.
+        # No distance computation is needed then
         for i=1:n
             @assert length(in2e[i]) == 1
             list[i] = in2e[i] |>  first
         end
-    end
-    # compute the nearest element for each node FIXME: this is n^2 complexity,
-    # should do an n complexity by using e.g. a cluster tree
-    for i in 1:n
-        x = xnodes[i]
-        d = map(j -> norm(x .- ynodes[j]),1:m)
-        dmin,idx_min = findmin(d)
-        if dmin ≤ tol
-            @assert length(in2e[idx_min]) == 1
-            list[i] = in2e[idx_min] |>  first
+    else
+        # compute the nearest element for each node FIXME: this is n^2 complexity,
+        # should do an n complexity by using e.g. a cluster tree
+        for i in 1:n
+            x = xnodes[i]
+            d = map(j -> norm(x .- ynodes[j]),1:m)
+            dmin,idx_min = findmin(d)
+            if dmin ≤ tol
+                @assert length(in2e[idx_min]) == 1
+                list[i] = in2e[idx_min] |>  first
+            end
         end
     end
     return list
