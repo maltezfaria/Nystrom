@@ -10,7 +10,7 @@ using Suppressor
 using IterativeSolvers
 using SparseArrays
 using GSL
-# using GmshTools
+using GmshTools
 using gmsh
 using Printf
 

@@ -1,4 +1,4 @@
-using Nystrom, GmshTools, GeometryTypes, HMatrices, LinearMaps, IterativeSolvers, LinearAlgebra, Clusters
+using Nystrom, gmsh GeometryTypes, HMatrices, LinearMaps, IterativeSolvers, LinearAlgebra, Clusters
 path = @__DIR__
 
 function main()

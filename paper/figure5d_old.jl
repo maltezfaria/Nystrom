@@ -1,4 +1,4 @@
-using Nystrom, Test, Logging, GeometryTypes, LinearAlgebra, Plots, GmshTools, LaTeXStrings,LinearMaps, IterativeSolvers
+using Nystrom, Test, Logging, GeometryTypes, LinearAlgebra, Plots, gmsh LaTeXStrings,LinearMaps, IterativeSolvers
 using Nystrom: SingleLayerKernel, DoubleLayerKernel, Laplace, Stokes, quadgen, SingleLayerPotential, DoubleLayerPotential,
     Helmholtz, Stokes, Maxwell, SingleLayerOperator, DoubleLayerOperator, IOpCorrection, AdjointDoubleLayerKernel,
     HypersingularKernel, AdjointDoubleLayerOperator, HypersingularOperator
