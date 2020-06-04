@@ -53,9 +53,7 @@ export
     quadgengmsh
 
 include("interface.jl")
-
 include("gmshquadrature.jl")
-
 include("kernels.jl")
 include("laplace.jl")
 include("helmholtz.jl")
@@ -66,16 +64,11 @@ include("potential.jl")
 include("integraloperators.jl")
 include("greenscorrection.jl")
 include("assemble.jl")
-
-################################################################################
-## UTILS
-################################################################################
-include("Utils/testutils.jl")
-include("Utils/geometryutils.jl")
-include("Utils/math.jl")
-include("Utils/conversions.jl")
-include("Utils/exactsolutions.jl")
-include("Utils/gmshaddons.jl")
+include("geometryutils.jl")
+include("mathutils.jl")
+include("conversions.jl")
+include("exactsolutions.jl")
+# include("Utils/gmshaddons.jl")
 # include("Utils/utils.jl")
 
 function debug(flag=true)
