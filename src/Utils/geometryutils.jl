@@ -5,7 +5,7 @@ function source_gen(iop::IntegralOperator,kfactor=5)
     return source_gen(iop,nbasis,kfactor=kfactor)
 end
 
-function source_gen(iop,nsources;kfactor=5)
+function source_gen(iop,nsources;kfactor)
     N      = ambient_dim(iop)
     Y      = iop.Y
     pts    = getnodes(Y)
@@ -24,7 +24,7 @@ function source_gen(iop,nsources;kfactor=5)
     return xs
 end
 
-function circle_sources(;nsources, radius=5, center=[0 0])
+function circle_sources(;nsources, radius, center)
     dtheta = 2π / nsources
     theta = dtheta.*collect(0:1:nsources-1)
     Xs = Point{2,Float64}[]
@@ -37,7 +37,7 @@ function circle_sources(;nsources, radius=5, center=[0 0])
     return Xs
 end
 
-function circle_random_sources(;nsources, radius=5, center=[0 0])
+function circle_random_sources(;nsources, radius, center)
     theta = 2π.*rand(nsources)
     Xs = Point{2,Float64}[]
     for th in theta
@@ -49,7 +49,7 @@ function circle_random_sources(;nsources, radius=5, center=[0 0])
     return Xs
 end
 
-function sphere_sources(;nsources, radius=5, center=[0 0 0])
+function sphere_sources_random(;nsources, radius, center)
     Xs = Point{3,Float64}[]
     for n in 1:nsources
             θ,φ = rand()*2π, rand()*π
@@ -62,7 +62,7 @@ function sphere_sources(;nsources, radius=5, center=[0 0 0])
     return Xs
 end
 
-function sphere_sources_uniform(;nsources, radius=10, center=[0 0 0])
+function sphere_sources_uniform(;nsources, radius, center)
     Xs = Point{3,Float64}[]
     n  = ceil(sqrt(nsources)) # number of sources per direction (same for θ and φ)
     for i=1:n
@@ -231,7 +231,7 @@ function lebedev_points(n)
         return pts
     else
         @warn "Unable to return $n Lebedev points"
-        lebedev_points(50)
+        sphere_sources_uniform(nsources=n,radius=1,center=(0,0,0))
     end
 end
 

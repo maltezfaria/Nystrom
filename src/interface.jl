@@ -7,6 +7,7 @@
 flist = (:getnodes, :getnormals, :getweights, :getelements, :getnode, :getweight, :getnormal, :getelement)
 for f in flist
     @eval begin
+        function $f end
         @generated function $f(Y,args...;kwargs...)
             mY = parentmodule(Y)
             return quote
