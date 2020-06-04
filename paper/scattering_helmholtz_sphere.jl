@@ -51,6 +51,6 @@ function fig_gen()
 end
 
 fig = fig_gen()
-fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig4b.pdf"
+fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/scattering_helmholtz_sphere.pdf"
 savefig(fig,fname)
 display(fig)

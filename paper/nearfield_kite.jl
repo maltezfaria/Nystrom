@@ -54,6 +54,6 @@ p         = 4
 h         = 0.1
 pde       = Helmholtz(dim=dim,k=2π)
 fig       = near_field_error(pde,dim,p,h)
-fname     = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig3c.pdf"
+fname     = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/neafield_kite.pdf"
 savefig(fig,fname)
 display(fig)

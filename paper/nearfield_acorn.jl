@@ -45,15 +45,6 @@ function near_field_error(pde,dim,p,h)
     field_error_down = log10.(abs.(U-Udown))
     surface!(fig,xdown,y,zero(field_error_down),surfacecolor=field_error_down,
              legend=false,clims=(-6,0),colorscale=false)
-    # heatmap!(fig,xdown,y,field_error_down)
-    # matwrite("/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig3d.mat", Dict(
-    #     "xdown" => xdown|>collect,
-    #     "xup" => xup|>collect,
-    #     "y" => y|>collect,
-    #     "field_error_up" => field_error_up,
-    #     "field_error_down" => field_error_down
-    # )
-    #         )
     return fig
 end
 
@@ -68,5 +59,5 @@ pde        = Helmholtz(dim=dim,k=2π)
 fig       = near_field_error(pde,dim,p,h)
 Plots.hdf5plot_write(fig, "plotsave.hdf5")
 display(fig)
-# fname     = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig3d.svg"
-# savefig(fig,fname)
+fname     = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/nearfield_acorn.svg"
+savefig(fig,fname)
