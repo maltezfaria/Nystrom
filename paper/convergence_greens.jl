@@ -2,7 +2,7 @@ using Nystrom, FastGaussQuadrature, Plots, LinearAlgebra, ParametricSurfaces, La
 using Nystrom: error_interior_green_identity, error_interior_derivative_green_identity
 
 function convergence_interior_greens_identity(op,dim,qorder,h,niter;derivative=false)
-    geo = dim == 2 ? Circle() : Sphere()
+    geo = dim == 2 ? Kite() : Bean()
     fig       = plot(yscale=:log10,xscale=:log10,
                      xlabel= dim==2 ? L"N" : L"\sqrt{N}",ylabel="error",legend=:bottomleft,
                      framestyle=:box,xtickfontsize=10,ytickfontsize=10)
@@ -57,58 +57,58 @@ end
 dim       = 2
 qorder    = (2,3,4)
 h         = 1.0
-niter     = 6
+niter     = 8
 
-# #1a
-# operators = Helmholtz(dim =dim,k =1)
-# fig       = convergence_interior_greens_identity(operators,dim,qorder,h,niter;derivative=false)
-# fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1a.pdf"
-# savefig(fig,fname)
+#1a
+operators = Helmholtz(dim =dim,k =1)
+fig       = convergence_interior_greens_identity(operators,dim,qorder,h,niter;derivative=false)
+fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/greens_helm_2d.pdf"
+savefig(fig,fname)
 
-# # 1b
-# operators = Helmholtz(dim =dim,k =1)
-# fig       = convergence_interior_greens_identity(operators,dim,qorder,h,niter;derivative=true)
-# fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1b.pdf"
-# savefig(fig,fname)
+# 1b
+operators = Helmholtz(dim =dim,k =1)
+fig       = convergence_interior_greens_identity(operators,dim,qorder,h,niter;derivative=true)
+fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/greensp_helm_2d.pdf"
+savefig(fig,fname)
 
-# # 1c
-# operators = Elastodynamic(dim=dim,μ=1,ρ=1,λ=1,ω=1)
-# fig       = convergence_interior_greens_identity(operators,dim,qorder,h,niter;derivative=false)
-# fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1c.pdf"
-# savefig(fig,fname)
+# 1c
+operators = Elastodynamic(dim=dim,μ=1,ρ=1,λ=2,ω=1)
+fig       = convergence_interior_greens_identity(operators,dim,qorder,h,niter;derivative=false)
+fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/greens_elastody_2d.pdf"
+savefig(fig,fname)
 
-# # figure1d
-# operators = Elastodynamic(dim =dim,μ =1,ρ =1,λ =1,ω =1)
-# fig       = convergence_interior_greens_identity(operators,dim,qorder,h,niter;derivative=true)
-# fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig1d.pdf"
-# savefig(fig,fname)
+# 1d
+operators = Elastodynamic(dim =dim,μ =1,ρ =1,λ =2,ω =1)
+fig       = convergence_interior_greens_identity(operators,dim,qorder,h,niter;derivative=true)
+fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/greensp_elastody_2d.pdf"
+savefig(fig,fname)
 
-# figure2
-dim       = 3
-qorder    = (2,3,4)
-h         = 2.0
-niter     = 4
+# # figure2
+# dim       = 3
+# qorder    = (2,3,4)
+# h         = 2.0
+# niter     = 4
 
 # #2a
 # operator  = Helmholtz(dim=dim,k =1)
 # fig       = convergence_interior_greens_identity(operator,dim,qorder,h,niter;derivative=false)
-# fname     = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig2a.pdf"
+# fname     = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/greens_helm_3d.pdf"
 # savefig(fig,fname)
 
 # #2b
 # operator = Helmholtz(dim =dim,k =1)
 # fig       = convergence_interior_greens_identity(operator,dim,qorder,h,niter;derivative=true)
-# fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig2b.pdf"
+# fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/greensp_helm_3d.pdf"
 # savefig(fig,fname)
 
 # #2c
-# operator = Elastodynamic(dim =dim,μ =1,ρ =1,λ =1,ω =1)
+# operator = Elastodynamic(dim =dim,μ =1,ρ =1,λ =2,ω =1)
 # fig       = convergence_interior_greens_identity(operator,dim,qorder,h,niter;derivative=false)
-# fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig2c.pdf"
+# fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/greens_elastody_3d.pdf"
 # savefig(fig,fname)
 
-#2d
-operators = Elastodynamic(dim =dim,μ =1,ρ =1,λ =1,ω =1)
-fig       = convergence_interior_greens_identity(operators,dim,qorder,h,niter;derivative=true)
-fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig2d.pdf"
-savefig(fig,fname)
+# # 2d
+# operators = Elastodynamic(dim =dim,μ =1,ρ =1,λ =2,ω =1)
+# fig       = convergence_interior_greens_identity(operators,dim,qorder,h,niter;derivative=true)
+# fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/greensp_elastody_3d.pdf"
+# savefig(fig,fname)

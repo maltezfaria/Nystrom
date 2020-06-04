@@ -1,4 +1,4 @@
-using Nystrom, FastGaussQuadrature, Plots, LinearAlgebra, IterativeSolvers, ParametricSurfaces
+using Nystrom, FastGaussQuadrature, Plots, LinearAlgebra, IterativeSolvers, ParametricSurfaces, LaTeXStrings
 using Nystrom: circle_helmholtz_soundsoft, error_exterior_green_identity, Point
 
 function scattering_helmholtz_circle_soundsoft(qorder,h,niter)
@@ -6,17 +6,17 @@ function scattering_helmholtz_circle_soundsoft(qorder,h,niter)
     R = 1
     geo = Circle(radius=R)
     xtest = [Point(2*R*cos(θ),2*R*sin(θ)) for θ in 0:0.1:2π]
-    fig       = plot(yscale=:log10,xscale=:log10,xlabel="N",ylabel="error",
-                     framestyle=:box,xtickfontsize=10,ytickfontsize=10)
-    k         = 2π
+    fig       = plot(yscale=:log10,xscale=:log10,framestyle=:box,xtickfontsize=10,ytickfontsize=10,
+                     xlabel=L"N",ylabel="error")
+    k         = π
     pde       = Helmholtz(dim=dim,k=k)
     ue(x) = circle_helmholtz_soundsoft(x;radius=R,θin=θ,k=k)
-    θ     = 2π/3
+    θ     = π/2
     kx    = cos(θ)*k
     ky    = sin(θ)*k
     for p in qorder
         conv_order = p + 1
-        meshgen!(geo,h)
+        meshgen!(geo,p*h)
         gmres_iter = []
         dof        = []
         ee         = []
@@ -33,17 +33,16 @@ function scattering_helmholtz_circle_soundsoft(qorder,h,niter)
             push!(dof,length(Γ))
             refine!(geo)
         end
-        plot!(fig,dof,ee,label=Nystrom.getname(pde)*": p=$p",m=:o,color=p)
-        plot!(fig,dof,1 ./(dof.^conv_order)*dof[end]^(conv_order)*ee[end],
-              label="",linewidth=4,color=p)
+        plot!(fig,dof,ee,label=Nystrom.getname(pde)*": P=$p",m=:o,color=p)
+        # plot!(fig,dof,1 ./(dof.^conv_order)*dof[end]^(conv_order)*ee[end],
+        #       label="",linewidth=4,color=p)
     end
     return fig
 end
 
-
 qorder = (2,3,4)
-h      = 0.1
-niter  = 4
+h      = 0.2
+niter  = 6
 fig    = scattering_helmholtz_circle_soundsoft(qorder,h,niter)
 fname = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig4a.pdf"
 savefig(fig,fname)

@@ -1,22 +1,25 @@
 using Nystrom, FastGaussQuadrature, Plots, LinearAlgebra, IterativeSolvers, ParametricSurfaces
 using ParametricSurfaces: getnodes
-using Nystrom: error_interior_green_identity, error_exterior_green_identity
+using Nystrom: error_interior_green_identity, error_exterior_green_identity, Point
+using MAT
 
 function near_field_error(pde,dim,p,h)
-    geo = Bean(;paxis=(-1,-1,1))
-    fig = plot(size=(800,800),clims=(-6,0),camera=(90,-80),axis=[],grid=false,legend=:none,colormap=:inferno,framestyle=:box)
+    geo = Acorn(rotation=(pi/2,0,0))
+    fig = surface(clims=(-6,0),axis=false,colormap=:inferno,
+               xlabel="x",ylabel="y",zlabel="z",legend=true)
+    plot!(fig,geo)
     # construct exterior solution
-    xin  = (0.0,0.1,0.)
+    xin  = Point(0.0,0.1,0.)
     c    = pde isa Union{Helmholtz,Laplace} ? 1 : ones(dim)
     u    = (x)   -> SingleLayerKernel(pde)(xin,x)*c
     dudn = (x,n) -> transpose(DoubleLayerKernel(pde)(xin,x,n))*c
     # upper and bottom plane
-    δ   = 0.05
-    y   = -1.2:δ:1.2
-    xup = 0:δ:1.2
+    δ   = 0.1
+    y   = -4:δ:4
+    xup = 0:δ:4
     Xup = [(x,y,0.) for y in y, x in xup]
     Uup = [u(x) for x in Xup]
-    xdown   = -1.2:δ:0
+    xdown   = -4:δ:0
     Xdown   = [(x,y,0.) for y in y, x in xdown]
     Udown = [u(x) for x in Xdown]
     meshgen!(geo,h)
@@ -31,46 +34,39 @@ function near_field_error(pde,dim,p,h)
     SL, DL = single_double_layer(pde,Xup,Γ;correction=:nothing)
     U  = DL*σ - im*pde.k*SL*σ
     U  = reshape(U,length(y),length(xup))
-    field_error = log10.(abs.(U-Uup))
-    surface!(fig,xup,y,zero(field_error),surfacecolor=field_error)
+    field_error_up = log10.(abs.(U-Uup))
+    surface!(fig,xup,y,zero(field_error_up),surfacecolor=field_error_up,
+             legend=false, clims=(-6,0))
+    # heatmap!(fig,xup,y,field_error_up)
     # error correction
     SL, DL = single_double_layer(pde,Xdown,Γ)
     U  = DL*σ - im*pde.k*SL*σ
     U  = reshape(U,length(y),length(xdown))
-    field_error = log10.(abs.(U-Udown))
-    surface!(fig,xdown,y,zero(field_error),surfacecolor=field_error)
+    field_error_down = log10.(abs.(U-Udown))
+    surface!(fig,xdown,y,zero(field_error_down),surfacecolor=field_error_down,
+             legend=false,clims=(-6,0),colorscale=false)
+    # heatmap!(fig,xdown,y,field_error_down)
+    # matwrite("/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig3d.mat", Dict(
+    #     "xdown" => xdown|>collect,
+    #     "xup" => xup|>collect,
+    #     "y" => y|>collect,
+    #     "field_error_up" => field_error_up,
+    #     "field_error_down" => field_error_down
+    # )
+    #         )
     return fig
 end
 
 # figure 3d
-# pyplot()
-plotlyjs()
+#
+# plotly()
+hdf5()
 dim       = 3
 p         = 4
 h         = 0.25
 pde        = Helmholtz(dim=dim,k=2π)
 fig       = near_field_error(pde,dim,p,h)
-
-function plot_geo(fig,geo,h=0.1)
-    for patch in geo.parts
-        domain = patch.domain
-        xmin,ymin = domain.origin
-        xmax,ymax   = domain.origin + domain.widths
-        xrange = xmin:h:xmax
-        yrange = ymin:h:ymax
-        pts    = [patch.parametrization((x,y)) for x in xrange, y in yrange]
-        x      =  [pt[1] for pt in pts]
-        y      =  [pt[2] for pt in pts]
-        z      =  [pt[3] for pt in pts]
-        surface!(fig,x,y,z,color=:gray50)
-    end
-    return fig
-end
-
-geo = Bean(;paxis=(-1,-1,1))
-plot_geo(fig,geo)
-
+Plots.hdf5plot_write(fig, "plotsave.hdf5")
 display(fig)
-
-fname     = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig3d.svg"
-savefig(fig,fname)
+# fname     = "/home/lfaria/Dropbox/Luiz-Carlos/general_regularization/draft/figures/fig3d.svg"
+# savefig(fig,fname)

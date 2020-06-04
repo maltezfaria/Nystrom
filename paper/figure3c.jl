@@ -48,7 +48,7 @@ function near_field_error(pde,dim,p,h)
     return fig
 end
 
-# figure 3a
+# figure 3c
 dim       = 2
 p         = 4
 h         = 0.1

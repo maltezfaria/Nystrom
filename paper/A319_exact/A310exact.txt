@@ -1,0 +1,12 @@
+"surface area: $(sum(Γ.weights))" = "surface area: 6.531732578910398e8"
+ 29.261686 seconds (13.31 M allocations: 31.501 GiB, 10.01% gc time)
+  8.090809 seconds (9.74 M allocations: 488.106 MiB, 9.77% gc time)
+  4.999927 seconds (10.90 M allocations: 13.044 GiB, 32.38% gc time)
+  0.155122 seconds (111.69 k allocations: 5.200 MiB)
+ 11.713426 seconds (1.26 M allocations: 7.698 GiB, 5.72% gc time)
+"surface area: $(sum(Γ.weights))" = "surface area: 6.522556409455422e8"
+  5.645689 seconds (873.72 k allocations: 7.997 GiB)
+  0.584587 seconds (180.31 k allocations: 27.803 MiB)
+  0.870837 seconds (2.14 M allocations: 4.552 GiB, 47.44% gc time)
+  0.013551 seconds (53 allocations: 2.188 KiB)
+  5.863353 seconds (251.09 k allocations: 5.390 GiB, 0.20% gc time)

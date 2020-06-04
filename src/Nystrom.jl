@@ -56,28 +56,16 @@ include("interface.jl")
 
 include("gmshquadrature.jl")
 
-################################################################################
-## KERNEL
-################################################################################
-include("Kernel/kernels.jl")
-include("Kernel/laplace.jl")
-include("Kernel/helmholtz.jl")
-include("Kernel/elastostatic.jl")
-include("Kernel/elastodynamic.jl")
-include("Kernel/stokes.jl")
-# include("Kernel/maxwell.jl")
-
-################################################################################
-## POTENTIALS
-################################################################################
-include("Potentials/potentials.jl")
-
-################################################################################
-## OPERATORS
-################################################################################
-include("Operators/integraloperators.jl")
-include("Operators/greenscorrection.jl")
-include("Operators/assemble.jl")
+include("kernels.jl")
+include("laplace.jl")
+include("helmholtz.jl")
+include("elastostatic.jl")
+include("elastodynamic.jl")
+include("stokes.jl")
+include("potential.jl")
+include("integraloperators.jl")
+include("greenscorrection.jl")
+include("assemble.jl")
 
 ################################################################################
 ## UTILS
@@ -90,5 +78,10 @@ include("Utils/exactsolutions.jl")
 include("Utils/gmshaddons.jl")
 # include("Utils/utils.jl")
 
+function debug(flag=true)
+    if flag
+        @eval ENV["JULIA_DEBUG"] = "Nystrom"
+    end
+end
 
 end # module
