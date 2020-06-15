@@ -18,7 +18,8 @@ function (SL::SingleLayerKernel{T,S})(x,y)::T  where {T,S<:Helmholtz}
     x==y && return zero(T)
     k = SL.op.k
     r = x .- y
-    d = norm(r)
+    # d = norm(r)
+    d  = sqrt(sum(r.^2))
     if N==2
         return im/4 * hankelh1(0,k*d)
     elseif N==3
@@ -32,7 +33,8 @@ function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:Helmholtz}
     x==y && return 0
     k = DL.op.k
     r = x .- y
-    d = norm(r)
+    # d = norm(r)
+    d  = sqrt(sum(r.^2))
     if N==2
         return im*k/4/d * hankelh1(1,k*d) .* dot(r,ny)
     elseif N==3
@@ -75,11 +77,12 @@ function (HS::HyperSingularKernel{T,S})(x,y,nx,ny)::T where {T,S<:Helmholtz}
     end
 end
 
-struct HelmholtzPML{N,T,S,P} <: AbstractPDE{N}
+struct HelmholtzPML{N,T,S,J} <: AbstractPDE{N}
     k::T
     τ::S
-    A::P
+    J::J
 end
+HelmholtzPML(;k,dim=3,τ,J) = HelmholtzPML{dim,typeof(k),typeof(τ),typeof(J)}(k,τ,J)
 
 getname(::HelmholtzPML) = "HelmholtzPML"
 
@@ -106,10 +109,10 @@ end
 # Double Layer Kernel
 function (DL::DoubleLayerKernel{T,S})(x,y,ny)::T where {T,S<:HelmholtzPML}
     τ  = DL.op.τ
-    A  = DL.op.A(y)
+    J  = DL.op.J(y)
     x  = τ(x)
     y  = τ(y)
-    ny = A*ny
+    ny = det(J)*transpose(inv(J))*ny
     N  = ambient_dim(S)
     k  = DL.op.k
     r  = x .- y
