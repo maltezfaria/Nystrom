@@ -72,3 +72,39 @@ end
 
 adjointdoublelayer(args...;kwargs...) = adjointdoublelayer_hypersingular(args...;kwargs...)[1]
 hypersingular(args...;kwargs...)      = adjointdoublelayer_hypersingular(args...;kwargs...)[2]
+
+function _single_double_layer(pde,X,Y=X;compress=Matrix,correction=:greenscorrection,xs)
+    Sop  = SingleLayerOperator(pde,X,Y)
+    Dop  = DoubleLayerOperator(pde,X,Y)
+    # convert to a possibly more efficient format
+    @time begin
+        @info "assembling dense part..."
+        S = compress(Sop)
+        D = compress(Dop)
+    end
+    @info "done."
+    if correction == :greenscorrection
+        # compute corrections
+        @time begin
+            @info "building correction..."
+            δS = GreensCorrection(Sop,S,D,xs)
+            δD = GreensCorrection(Dop,δS.R,δS.L,δS.idxel_near)  # reuse precomputed quantities of δS
+        end
+        @time begin
+            @info "\t converting to sparse..."
+            δS_sparse = sparse(δS)
+            δD_sparse = sparse(δD)
+        end
+        # add corrections to the dense part
+        @time begin
+            @info "adding correction to dense part..."
+            axpy!(true,δS_sparse,S)
+            axpy!(true,δD_sparse,D)
+        end
+        return S,D
+    elseif correction == :nothing
+        return S,D
+    else
+        error("unrecognized correction method")
+    end
+end
