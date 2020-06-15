@@ -2,7 +2,7 @@ using gmsh, LinearAlgebra
 path = @__DIR__
 gmsh.initialize()
 gmsh.clear()
-λ = 2e3
+λ = 0.5e3
 h = λ/10 # approximate element size for plotting the field
 k = 2π/λ
 order = 1
@@ -44,7 +44,7 @@ gmsh.model.mesh.generate(2)
 gmsh.write("xzplane.msh")
 
 # h = λ/10 # approximate element size
-h   = 200
+h   = 100
 gmsh.option.setNumber("Mesh.CharacteristicLengthMax",h)
 
 gmsh.clear()
