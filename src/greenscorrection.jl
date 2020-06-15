@@ -169,6 +169,62 @@ function precompute_weights_qr(c::GreensCorrection{T}) where {T<:AbstractMatrix{
     return w
 end
 
+function precompute_weights_lq(c::GreensCorrection{T}) where {T<:Number}
+    w = [Vector{T}() for _ in 1:size(c,1)]
+    iop  = c.iop
+    a,b  = combined_field_coefficients(iop.kernel)
+    X,Y  = iop.X, iop.Y
+    L    = Vector{Matrix{T}}(undef,length(c.L))
+    Q    = Vector{Matrix{T}}(undef,length(c.L))
+    mutex = Threads.SpinLock()
+    @threads for i in 1:size(c,1)
+        idx_el    = c.idxel_near[i]
+        idx_el < 0 && continue
+        idx_nodes = getelements(iop.Y)[idx_el]
+        ninterp = length(idx_nodes)
+        if !isassigned(L,idx_el)
+            lock(mutex)
+            F         = lq(c.L[idx_el])
+            Q[idx_el] = Matrix(F.Q)
+            L[idx_el] = F.L
+            unlock(mutex)
+        end
+        tmp      = (c.R[i:i,:]*adjoint(Q[idx_el]))/L[idx_el]
+        w[i]     = axpby!(a,view(tmp,1:ninterp),b,view(tmp,(ninterp+1):(2*ninterp)))
+    end
+    return w
+end
+
+# Tensor case. We need to convert the *matrix of matrices* structures to flat
+# matrices for doing qr, then convert back. Not very efficient... but may be not
+# very important?
+function precompute_weights_lq(c::GreensCorrection{T}) where {T<:AbstractMatrix{S}} where {S}
+    w   = [Vector{T}() for _ in 1:size(c,1)]
+    iop = c.iop
+    a,b = combined_field_coefficients(iop.kernel)
+    X,Y = iop.X, iop.Y
+    L    = Vector{Matrix{S}}(undef,length(c.L))
+    Q    = Vector{Matrix{S}}(undef,length(c.L))
+    mutex = Threads.SpinLock()
+    @threads for i in 1:size(c,1)
+        idx_el    = c.idxel_near[i]
+        idx_el < 0 && continue
+        idx_nodes = getelements(iop.Y)[idx_el]
+        ninterp = length(idx_nodes)
+        if !isassigned(L,idx_el)
+            F         = lq!(Matrix(c.L[idx_el]))
+            lock(mutex)
+            Q[idx_el] = Matrix(F.Q)
+            L[idx_el] = F.L
+            unlock(mutex)
+        end
+        tmp  = (Matrix(c.R[i:i,:])*adjoint(Q[idx_el]))/L[idx_el]
+        tmp2 = matrix_to_blockmatrix(T,tmp)
+        w[i] = @views a*tmp2[1:ninterp] + b*tmp2[ninterp+1:end]
+    end
+    return w
+end
+
 function precompute_weights_tikhonov(c::GreensCorrection{T},δ=0) where {T<:Number}
     w = [Vector{T}() for _ in 1:size(c,1)]
     iop  = c.iop
@@ -234,7 +290,7 @@ function Base.Matrix(c::GreensCorrection)
     iop = c.iop
     a,b   = combined_field_coefficients(iop.kernel)
     M     = zero(c)
-    w     = precompute_weights_qr(c)
+    w     = precompute_weights_lq(c)
     for i in 1:size(c,1)
         idx_el    = c.idxel_near[i]
         idx_el < 0 && continue
@@ -252,7 +308,7 @@ function SparseArrays.sparse(c::GreensCorrection)
     I = Int[]
     J = Int[]
     V = T[]
-    w = precompute_weights_qr(c)
+    w = precompute_weights_lq(c)
     for i in 1:size(c,1)
         idx_el    = c.idxel_near[i]
         idx_el < 0 && continue
@@ -267,7 +323,7 @@ end
 function LinearAlgebra.axpy!(a,X::GreensCorrection,Y::Matrix)
     iop = X.iop
     c1,c2 = combined_field_coefficients(iop.kernel)
-    w     = precompute_weights_qr(X)
+    w     = precompute_weights_lq(X)
     for i in 1:size(X,1)
         idx_el    = X.idxel_near[i]
         idx_el < 0 && continue
