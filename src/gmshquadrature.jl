@@ -25,8 +25,7 @@ function Base.permute!(quad::Quadrature,perm::Vector{Int})
     return quad
 end
 
-function quadgengmsh(qtype,dimtags)
-    N = 3
+function quadgengmsh(qtype,dimtags,N=3)
     quad = Quadrature{N,Float64}()
     for (dim,tag) in dimtags
         etypes, etags, ntags = gmsh.model.mesh.getElements(dim,tag)

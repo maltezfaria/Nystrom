@@ -1,6 +1,6 @@
 module Nystrom
 
-using GeometryTypes: Point, Normal, Mat
+using GeometryTypes: Point, Normal, Mat, Vec
 using LinearAlgebra
 using Base.Threads
 using SpecialFunctions

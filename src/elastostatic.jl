@@ -10,7 +10,7 @@ Elastostatic{N}(μ::T,λ::T) where {N,T} = Elastostatic{N,T}(μ,λ)
 
 getname(::Elastostatic) = "Elastostatic"
 
-default_kernel_eltype(::Elastostatic{N}) where {N} = Mat{N,N,Float64,N*N}
+default_kernel_eltype(::Elastostatic{N}) where {N}  = Mat{N,N,Float64,N*N}
 default_density_eltype(::Elastostatic{N}) where {N} = Vec{N,Float64}
 
 # Single Layer
