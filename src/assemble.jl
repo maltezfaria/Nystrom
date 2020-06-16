@@ -2,30 +2,17 @@ function single_double_layer(pde,X,Y=X;compress=Matrix,correction=:greenscorrect
     Sop  = SingleLayerOperator(pde,X,Y)
     Dop  = DoubleLayerOperator(pde,X,Y)
     # convert to a possibly more efficient format
-    @time begin
-        @info "assembling dense part..."
-        S = compress(Sop)
-        D = compress(Dop)
-    end
-    @info "done."
+    S = compress(Sop)
+    D = compress(Dop)
     if correction == :greenscorrection
         # compute corrections
-        @time begin
-            @info "building correction..."
-            δS = GreensCorrection(Sop,S,D)
-            δD = GreensCorrection(Dop,δS.R,δS.L,δS.idxel_near)  # reuse precomputed quantities of δS
-        end
-        @time begin
-            @info "\t converting to sparse..."
-            δS_sparse = sparse(δS)
-            δD_sparse = sparse(δD)
-        end
+        δS = GreensCorrection(Sop,S,D)
+        δD = GreensCorrection(Dop,δS.R,δS.L,δS.idxel_near)  # reuse precomputed quantities of δS
+        δS_sparse = sparse(δS)
+        δD_sparse = sparse(δD)
         # add corrections to the dense part
-        @time begin
-            @info "adding correction to dense part..."
-            axpy!(true,δS_sparse,S)
-            axpy!(true,δD_sparse,D)
-        end
+        axpy!(true,δS_sparse,S)
+        axpy!(true,δD_sparse,D)
         return S,D
     elseif correction == :nothing
         return S,D
@@ -40,28 +27,16 @@ function adjointdoublelayer_hypersingular(pde,X,Y=X;compress=Matrix,correction=:
     ADop  = AdjointDoubleLayerOperator(pde,X,Y)
     Hop   = HyperSingularOperator(pde,X,Y)
     # convert to a possibly more efficient compress
-    @time begin
-        @info "assembling dense part..."
-        AD = compress(ADop)
-        H  = compress(Hop)
-    end
+    AD = compress(ADop)
+    H  = compress(Hop)
     if correction == :greenscorrection
         # compute corrections
-        @time begin
-            @info "building correction..."
-            δAD = GreensCorrection(ADop,AD,H)
-            δH  = GreensCorrection(Hop,δAD.R,δAD.L,δAD.idxel_near) # reuse precomputed quantities of δAD
-        end
-        @time begin
-            @info "\t converting to sparse..."
-            δAD_sparse = sparse(δAD)
-            δH_sparse = sparse(δH)
-        end
-        @time begin
-            @info "adding correction to dense part..."
-            axpy!(true,δAD_sparse,AD)
-            axpy!(true,δH_sparse,H)
-        end
+        δAD = GreensCorrection(ADop,AD,H)
+        δH  = GreensCorrection(Hop,δAD.R,δAD.L,δAD.idxel_near) # reuse precomputed quantities of δAD
+        δAD_sparse = sparse(δAD)
+        δH_sparse = sparse(δH)
+        axpy!(true,δAD_sparse,AD)
+        axpy!(true,δH_sparse,H)
         return AD, H
     elseif correction == :nothing
         return AD,H
@@ -77,30 +52,17 @@ function _single_double_layer(pde,X,Y=X;compress=Matrix,correction=:greenscorrec
     Sop  = SingleLayerOperator(pde,X,Y)
     Dop  = DoubleLayerOperator(pde,X,Y)
     # convert to a possibly more efficient format
-    @time begin
-        @info "assembling dense part..."
-        S = compress(Sop)
-        D = compress(Dop)
-    end
-    @info "done."
+    S = compress(Sop)
+    D = compress(Dop)
     if correction == :greenscorrection
         # compute corrections
-        @time begin
-            @info "building correction..."
-            δS = GreensCorrection(Sop,S,D,xs)
-            δD = GreensCorrection(Dop,δS.R,δS.L,δS.idxel_near)  # reuse precomputed quantities of δS
-        end
-        @time begin
-            @info "\t converting to sparse..."
-            δS_sparse = sparse(δS)
-            δD_sparse = sparse(δD)
-        end
+        δS = GreensCorrection(Sop,S,D,xs)
+        δD = GreensCorrection(Dop,δS.R,δS.L,δS.idxel_near)  # reuse precomputed quantities of δS
+        δS_sparse = sparse(δS)
+        δD_sparse = sparse(δD)
         # add corrections to the dense part
-        @time begin
-            @info "adding correction to dense part..."
-            axpy!(true,δS_sparse,S)
-            axpy!(true,δD_sparse,D)
-        end
+        axpy!(true,δS_sparse,S)
+        axpy!(true,δD_sparse,D)
         return S,D
     elseif correction == :nothing
         return S,D
