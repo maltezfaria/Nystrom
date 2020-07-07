@@ -60,15 +60,27 @@ function GreensCorrection(iop::IntegralOperator{T,K},Op1,Op2,basis,γ₁_basis,�
         end
     end
 
+    xnodes   = getnodes(X)
+    xnormals = getnormals(X)
     # integrate the basis over Y
     R  = Op1*γ₁B - Op2*γ₀B
     if kernel_type(iop) isa Union{SingleLayer,DoubleLayer}
-        if σ == -0.5
-            axpy!(σ,γ₀B,R) # R  += σ*γ₀B
+        if σ !== 0
+            for k in 1:nbasis
+                for i in 1:length(xnodes)
+                    R[i,k] += σ*basis[k](xnodes[i])
+                end
+            end
+            # axpy!(σ,γ₀B,R) # R  += σ*γ₀B(x)
         end
     elseif kernel_type(iop) isa Union{AdjointDoubleLayer,HyperSingular}
-        if σ == -0.5
-            axpy!(σ,γ₁B,R) #  R  += σ*γ₁B
+        if σ !== 0
+            for k in 1:nbasis
+                for i in 1:length(xnodes)
+                    R[i,k] += σ*γ₁_basis[k](xnodes[i],xnormals[i])
+                end
+            end
+            # axpy!(σ,γ₁B,R) #  R  += σ*γ₁B
         end
     end
 
@@ -92,7 +104,8 @@ function GreensCorrection(iop::IntegralOperator,Op1,Op2,xs::Vector{<:Point})
     op        = iop.kernel.op
     basis     = [y->SingleLayerKernel(op)(x,y) for x in xs]
     γ₁_basis  = [(y,ny)->transpose(DoubleLayerKernel(op)(x,y,ny)) for x in xs]
-    σ = iop.X === iop.Y ? -0.5 : 0
+    # σ = iop.X === iop.Y ? -0.5 : 0
+    σ = -0.5
     GreensCorrection(iop,Op1,Op2,basis,γ₁_basis,σ)
 end
 

@@ -61,7 +61,7 @@ function (pot::IntegralPotential)(::DoubleLayer,σ::AbstractVector,x)
     return out
 end
 
-Base.getindex(pot::IntegralPotential,σ::SurfaceDensity) = (x) -> pot(σ,x)
+Base.getindex(pot::IntegralPotential,σ::AbstractVector) = (x) -> pot(σ,x)
 
 SingleLayerPotential(op::AbstractPDE,surf) = IntegralPotential(SingleLayerKernel(op),surf)
 DoubleLayerPotential(op::AbstractPDE,surf) = IntegralPotential(DoubleLayerKernel(op),surf)
@@ -90,6 +90,3 @@ DoubleLayerPotential(op::AbstractPDE,surf) = IntegralPotential(DoubleLayerKernel
 #     end
 #     return out
 # end
-
-
-
