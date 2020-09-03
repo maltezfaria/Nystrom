@@ -1,3 +1,4 @@
+
 module Nystrom
 
 using GeometryTypes: Point, Normal, Mat, Vec
@@ -10,7 +11,7 @@ using Suppressor
 using IterativeSolvers
 using SparseArrays
 using GSL
-using GmshTools
+using gmsh #FIXME: not a registered package
 using Printf
 
 export
